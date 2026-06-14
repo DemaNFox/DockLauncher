@@ -1,0 +1,1 @@
+using Microsoft.Extensions.DependencyInjection; namespace DockLauncher.Modules.Icons.Application; public static class DependencyRegistration { public static IServiceCollection AddIconsApplication(this IServiceCollection services) => services; }

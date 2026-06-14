@@ -1,0 +1,1 @@
+using Microsoft.Extensions.DependencyInjection; namespace DockLauncher.Modules.Groups.Application; public static class DependencyRegistration { public static IServiceCollection AddGroupsApplication(this IServiceCollection services) => services; }

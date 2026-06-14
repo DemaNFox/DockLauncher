@@ -1,0 +1,1 @@
+namespace DockLauncher.Modules.FolderFlyouts.Presentation.Wpf; public static class AssemblyMarker { }

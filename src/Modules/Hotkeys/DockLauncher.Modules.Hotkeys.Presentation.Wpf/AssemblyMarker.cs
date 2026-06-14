@@ -1,0 +1,1 @@
+namespace DockLauncher.Modules.Hotkeys.Presentation.Wpf; public static class AssemblyMarker { }

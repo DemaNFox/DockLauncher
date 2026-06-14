@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DockLauncher.Modules.Tray.Application\DockLauncher.Modules.Tray.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DockLauncher.BuildingBlocks.Presentation.Wpf\DockLauncher.BuildingBlocks.Presentation.Wpf.csproj" />
+  </ItemGroup>
+</Project>

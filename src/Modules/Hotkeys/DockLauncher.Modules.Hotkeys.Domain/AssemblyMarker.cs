@@ -1,0 +1,1 @@
+namespace DockLauncher.Modules.Hotkeys.Domain; public static class AssemblyMarker { }

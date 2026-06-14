@@ -1,0 +1,1 @@
+using Microsoft.Extensions.DependencyInjection; namespace DockLauncher.Modules.Groups.Infrastructure; public static class ModuleRegistration { public static IServiceCollection AddGroupsModule(this IServiceCollection services) => services; }

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="System.IO.Abstractions.TestingHelpers" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\Settings\DockLauncher.Modules.Settings.Infrastructure\DockLauncher.Modules.Settings.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Settings\DockLauncher.Modules.Settings.Application\DockLauncher.Modules.Settings.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Panels\DockLauncher.Modules.Panels.Domain\DockLauncher.Modules.Panels.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Items\DockLauncher.Modules.Items.Domain\DockLauncher.Modules.Items.Domain.csproj" />
+  </ItemGroup>
+</Project>

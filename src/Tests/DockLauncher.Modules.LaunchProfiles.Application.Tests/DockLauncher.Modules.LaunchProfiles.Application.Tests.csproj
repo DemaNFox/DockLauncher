@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\LaunchProfiles\DockLauncher.Modules.LaunchProfiles.Application\DockLauncher.Modules.LaunchProfiles.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\LaunchProfiles\DockLauncher.Modules.LaunchProfiles.Domain\DockLauncher.Modules.LaunchProfiles.Domain.csproj" />
+  </ItemGroup>
+</Project>

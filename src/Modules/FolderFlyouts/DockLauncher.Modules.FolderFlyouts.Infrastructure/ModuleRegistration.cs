@@ -1,0 +1,1 @@
+using Microsoft.Extensions.DependencyInjection; namespace DockLauncher.Modules.FolderFlyouts.Infrastructure; public static class ModuleRegistration { public static IServiceCollection AddFolderFlyoutsModule(this IServiceCollection services) => services; }

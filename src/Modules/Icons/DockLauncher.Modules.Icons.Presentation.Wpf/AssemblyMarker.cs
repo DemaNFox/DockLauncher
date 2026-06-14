@@ -1,0 +1,1 @@
+namespace DockLauncher.Modules.Icons.Presentation.Wpf; public static class AssemblyMarker { }

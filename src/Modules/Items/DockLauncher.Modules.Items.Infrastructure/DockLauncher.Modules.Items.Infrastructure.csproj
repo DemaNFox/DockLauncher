@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DockLauncher.Modules.Items.Application\DockLauncher.Modules.Items.Application.csproj" />
+    <ProjectReference Include="..\DockLauncher.Modules.Items.Domain\DockLauncher.Modules.Items.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DockLauncher.BuildingBlocks.Infrastructure\DockLauncher.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\DockLauncher.BuildingBlocks.Application\DockLauncher.BuildingBlocks.Application.csproj" />
+  </ItemGroup>
+</Project>

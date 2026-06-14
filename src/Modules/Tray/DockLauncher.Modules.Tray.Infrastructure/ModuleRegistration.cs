@@ -1,0 +1,1 @@
+using Microsoft.Extensions.DependencyInjection; namespace DockLauncher.Modules.Tray.Infrastructure; public static class ModuleRegistration { public static IServiceCollection AddTrayModule(this IServiceCollection services) => services; }

@@ -1,0 +1,1 @@
+using Microsoft.Extensions.DependencyInjection; namespace DockLauncher.Modules.ShellIntegration.Application; public static class DependencyRegistration { public static IServiceCollection AddShellIntegrationApplication(this IServiceCollection services) => services; }

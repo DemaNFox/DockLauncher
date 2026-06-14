@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#FF1F2937" />
+
+    <SolidColorBrush x:Key="WindowBrush" Color="#0F172A" />
+    <SolidColorBrush x:Key="CardBrush" Color="#CC111827" />
+    <SolidColorBrush x:Key="CardBrushStrong" Color="#E5162434" />
+    <SolidColorBrush x:Key="CardStroke" Color="#334155" />
+    <SolidColorBrush x:Key="InputBrush" Color="#162131" />
+    <SolidColorBrush x:Key="InputStroke" Color="#334155" />
+    <SolidColorBrush x:Key="PrimaryBrush" Color="#38BDF8" />
+    <SolidColorBrush x:Key="PrimaryBrushDark" Color="#0EA5E9" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#94A3B8" />
+
+    <LinearGradientBrush x:Key="FlyoutBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Offset="0" Color="#F0192434" />
+        <GradientStop Offset="1" Color="#E60B1220" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="FlyoutBorderBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Offset="0" Color="#66FFFFFF" />
+        <GradientStop Offset="1" Color="#33D1D5DB" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="FlyoutItemBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Offset="0" Color="#F0374151" />
+        <GradientStop Offset="1" Color="#D91F2937" />
+    </LinearGradientBrush>
+</ResourceDictionary>

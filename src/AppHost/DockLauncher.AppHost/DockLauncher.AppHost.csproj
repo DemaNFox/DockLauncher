@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <StartupObject>DockLauncher.AppHost.Program</StartupObject>
+    <AssemblyName>DockLauncher</AssemblyName>
+    <Product>DockLauncher</Product>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="gong-wpf-dragdrop" />
+    <PackageReference Include="H.NotifyIcon.Wpf" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Serilog.Extensions.Logging" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.Development.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\DockLauncher.BuildingBlocks.Application\DockLauncher.BuildingBlocks.Application.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\DockLauncher.BuildingBlocks.Infrastructure\DockLauncher.BuildingBlocks.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\DockLauncher.BuildingBlocks.Presentation.Wpf\DockLauncher.BuildingBlocks.Presentation.Wpf.csproj" />
+    <ProjectReference Include="..\..\Integrations\DockLauncher.Integrations.Windows\DockLauncher.Integrations.Windows.csproj" />
+    <ProjectReference Include="..\..\Modules\Panels\DockLauncher.Modules.Panels.Application\DockLauncher.Modules.Panels.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Panels\DockLauncher.Modules.Panels.Infrastructure\DockLauncher.Modules.Panels.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Panels\DockLauncher.Modules.Panels.Presentation.Wpf\DockLauncher.Modules.Panels.Presentation.Wpf.csproj" />
+    <ProjectReference Include="..\..\Modules\Items\DockLauncher.Modules.Items.Application\DockLauncher.Modules.Items.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Items\DockLauncher.Modules.Items.Infrastructure\DockLauncher.Modules.Items.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Items\DockLauncher.Modules.Items.Presentation.Wpf\DockLauncher.Modules.Items.Presentation.Wpf.csproj" />
+    <ProjectReference Include="..\..\Modules\Settings\DockLauncher.Modules.Settings.Application\DockLauncher.Modules.Settings.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Settings\DockLauncher.Modules.Settings.Infrastructure\DockLauncher.Modules.Settings.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Settings\DockLauncher.Modules.Settings.Presentation.Wpf\DockLauncher.Modules.Settings.Presentation.Wpf.csproj" />
+    <ProjectReference Include="..\..\Modules\Groups\DockLauncher.Modules.Groups.Infrastructure\DockLauncher.Modules.Groups.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\LaunchProfiles\DockLauncher.Modules.LaunchProfiles.Infrastructure\DockLauncher.Modules.LaunchProfiles.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\FolderFlyouts\DockLauncher.Modules.FolderFlyouts.Infrastructure\DockLauncher.Modules.FolderFlyouts.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Icons\DockLauncher.Modules.Icons.Infrastructure\DockLauncher.Modules.Icons.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Tray\DockLauncher.Modules.Tray.Infrastructure\DockLauncher.Modules.Tray.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Hotkeys\DockLauncher.Modules.Hotkeys.Infrastructure\DockLauncher.Modules.Hotkeys.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\ShellIntegration\DockLauncher.Modules.ShellIntegration.Infrastructure\DockLauncher.Modules.ShellIntegration.Infrastructure.csproj" />
+  </ItemGroup>
+  <Target Name="RemoveLegacyAppHostArtifacts" AfterTargets="Build">
+    <ItemGroup>
+      <LegacyAppHostArtifacts Include="$(OutputPath)DockLauncher.AppHost.*" />
+    </ItemGroup>
+    <Delete Files="@(LegacyAppHostArtifacts)" TreatErrorsAsWarnings="true" />
+  </Target>
+</Project>

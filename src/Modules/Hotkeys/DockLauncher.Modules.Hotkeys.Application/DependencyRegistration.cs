@@ -1,0 +1,1 @@
+using Microsoft.Extensions.DependencyInjection; namespace DockLauncher.Modules.Hotkeys.Application; public static class DependencyRegistration { public static IServiceCollection AddHotkeysApplication(this IServiceCollection services) => services; }

@@ -1,0 +1,1 @@
+namespace DockLauncher.Modules.Icons.Domain; public static class AssemblyMarker { }
