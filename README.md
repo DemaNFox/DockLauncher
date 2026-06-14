@@ -30,6 +30,24 @@ dotnet build src\DockLauncher.sln --no-restore
 dotnet run --project src\AppHost\DockLauncher.AppHost\DockLauncher.AppHost.csproj
 ```
 
+## Publish
+
+Create a production package:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\Publish-DockLauncher.ps1
+```
+
+The package is written to `build\DockLauncher`.
+
+Create a Windows installer:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\Publish-DockLauncher.ps1 -Installer
+```
+
+Installer builds require Inno Setup 6 (`ISCC.exe`). The generated installer is written to `artifacts\installer`.
+
 ## Test
 
 ```powershell
