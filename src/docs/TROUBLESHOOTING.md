@@ -197,6 +197,33 @@ The new dialog was opened modally while the window XAML still requested `WindowS
 - `src/AppHost/DockLauncher.AppHost/Dialogs/ItemEditorService.cs`
 - `src/AppHost/DockLauncher.AppHost/Docking/DockShellCoordinator.cs`
 
+## 2026-06-30: Topmost dock could fall behind normal windows and group flyouts had unused width
+
+### Symptoms
+
+- A panel with `Always On Top` enabled could still be covered by another application window.
+- A tile group with nine items rendered as a three-column grid inside a fixed-width flyout, leaving an empty strip on the right.
+
+### Root cause
+
+- The panel relied only on WPF's `Topmost` dependency property. Its native topmost Z-order was not reaffirmed after the HWND was created or when runtime visibility was synchronized.
+- Group flyout width was hard-coded to 420/460 px while tile row calculations assumed a fixed column count regardless of the grid's useful width.
+
+### Fix
+
+- Apply `SetWindowPos(HWND_TOPMOST)` with non-activating flags after HWND initialization and during existing runtime state synchronization.
+- Evaluate every column count that physically fits within 90% of the work area and score candidates by aspect ratio, empty cells, last-row quality, and excessive elongation.
+- Prefer a complete layout; only use a height-bounded vertically scrolling layout when no complete candidate fits.
+- Give the selected column count and exact grid width to the WPF `UniformGrid`, so control chrome cannot cause an unintended second wrap.
+- Place the divider between the group header and the flyout content.
+
+### Files
+
+- `src/AppHost/DockLauncher.AppHost/Docking/DockPanelWindow.xaml.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/GroupFlyoutWindow.xaml`
+- `src/AppHost/DockLauncher.AppHost/Docking/GroupFlyoutWindowViewModel.cs`
+- `src/Tests/DockLauncher.UiSmoke.Tests/AppShellTests.cs`
+
 ## Rule For New Issues
 
 When a new issue is resolved:

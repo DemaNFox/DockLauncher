@@ -783,6 +783,62 @@ public class AppShellTests
     }
 
     [Fact]
+    public void GroupFlyoutLayout_Tiles_ShouldChooseBalancedGrids()
+    {
+        var compactLayout = GroupFlyoutWindowViewModel.CalculateLayout(
+            2,
+            PanelFlyoutDisplayMode.Tiles,
+            PanelGroupOpenMode.Floating);
+        var threeByThreeLayout = GroupFlyoutWindowViewModel.CalculateLayout(
+            9,
+            PanelFlyoutDisplayMode.Tiles,
+            PanelGroupOpenMode.Floating);
+        var tenItemLayout = GroupFlyoutWindowViewModel.CalculateLayout(
+            10,
+            PanelFlyoutDisplayMode.Tiles,
+            PanelGroupOpenMode.Floating);
+
+        compactLayout.Columns.Should().Be(2);
+        compactLayout.WindowSize.Width.Should().Be(280);
+        threeByThreeLayout.Columns.Should().Be(3);
+        threeByThreeLayout.Rows.Should().Be(3);
+        threeByThreeLayout.WindowSize.Width.Should().Be(372);
+        tenItemLayout.Columns.Should().Be(4);
+        tenItemLayout.Rows.Should().Be(3);
+        threeByThreeLayout.VerticalScrollEnabled.Should().BeFalse();
+        tenItemLayout.VerticalScrollEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void GroupFlyoutLayout_WhenContentCannotFit_ShouldUseNinetyPercentBoundsAndScroll()
+    {
+        var layout = GroupFlyoutWindowViewModel.CalculateLayout(
+            10_000,
+            PanelFlyoutDisplayMode.Tiles,
+            PanelGroupOpenMode.Floating);
+
+        layout.VerticalScrollEnabled.Should().BeTrue();
+        layout.WindowSize.Width.Should().BeLessThanOrEqualTo(Math.Floor(System.Windows.SystemParameters.WorkArea.Width * 0.9));
+        layout.WindowSize.Height.Should().BeLessThanOrEqualTo(Math.Floor(System.Windows.SystemParameters.WorkArea.Height * 0.9));
+    }
+
+    [Fact]
+    public void GroupFlyoutWindowSize_List_ShouldKeepTheConfiguredModeWidth()
+    {
+        var floatingSize = GroupFlyoutWindowViewModel.CalculateWindowSize(
+            9,
+            PanelFlyoutDisplayMode.List,
+            PanelGroupOpenMode.Floating);
+        var expandedSize = GroupFlyoutWindowViewModel.CalculateWindowSize(
+            9,
+            PanelFlyoutDisplayMode.List,
+            PanelGroupOpenMode.Expand);
+
+        floatingSize.Width.Should().Be(460);
+        expandedSize.Width.Should().Be(420);
+    }
+
+    [Fact]
     public async Task GroupFlyoutItemViewModel_ContextCommands_ShouldInvokeAttachedCallbacks()
     {
         var item = new DockLauncher.AppHost.Docking.GroupFlyoutItemViewModel(Guid.NewGuid(), "Editor", "notepad.exe", null, "Application");

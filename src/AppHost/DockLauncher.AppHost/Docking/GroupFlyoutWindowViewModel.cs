@@ -7,6 +7,14 @@ using System.Windows.Media;
 
 namespace DockLauncher.AppHost.Docking;
 
+public readonly record struct GroupFlyoutLayout(
+    Size WindowSize,
+    int Columns,
+    int Rows,
+    double GridWidth,
+    double GridHeight,
+    bool VerticalScrollEnabled);
+
 public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
 {
     private readonly Func<GroupFlyoutItemViewModel, Task> _launchAsync;
@@ -34,9 +42,15 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
         DisplayMode = displayMode;
         OpenMode = openMode;
         Items = items;
-        var windowSize = CalculateWindowSize(items.Count, displayMode, openMode);
-        WindowWidth = windowSize.Width;
-        WindowHeight = windowSize.Height;
+        var layout = CalculateLayout(items.Count, displayMode, openMode);
+        WindowWidth = layout.WindowSize.Width;
+        WindowHeight = layout.WindowSize.Height;
+        TileColumns = layout.Columns;
+        TileGridWidth = layout.GridWidth;
+        TileViewportWidth = layout.GridWidth + (layout.VerticalScrollEnabled ? ScrollBarWidth : 0);
+        TileVerticalScrollBarVisibility = layout.VerticalScrollEnabled
+            ? System.Windows.Controls.ScrollBarVisibility.Visible
+            : System.Windows.Controls.ScrollBarVisibility.Disabled;
         _launchAsync = launchAsync;
         _launchAsAdministratorAsync = launchAsAdministratorAsync;
         _openLocationAsync = openLocationAsync;
@@ -74,6 +88,14 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
 
     public double WindowHeight { get; }
 
+    public int TileColumns { get; }
+
+    public double TileGridWidth { get; }
+
+    public double TileViewportWidth { get; }
+
+    public System.Windows.Controls.ScrollBarVisibility TileVerticalScrollBarVisibility { get; }
+
     public bool IsFloatingMode => OpenMode == PanelGroupOpenMode.Floating;
 
     public Visibility TilesVisibility => DisplayMode == PanelFlyoutDisplayMode.Tiles ? Visibility.Visible : Visibility.Collapsed;
@@ -91,18 +113,128 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
 
     public static Size CalculateWindowSize(int itemCount, PanelFlyoutDisplayMode displayMode, PanelGroupOpenMode openMode)
     {
-        var workArea = SystemParameters.WorkArea;
-        var maxHeight = Math.Max(260, Math.Floor(workArea.Height * 0.78));
-        var width = openMode == PanelGroupOpenMode.Floating ? 460d : 420d;
-        const double chromeVerticalInset = 56d;
-        const double headerHeight = 52d;
-        const double contentBottomInset = 14d;
-        var contentHeight = displayMode == PanelFlyoutDisplayMode.List
-            ? Math.Max(90, itemCount * 66d)
-            : Math.Max(98, Math.Ceiling(Math.Max(itemCount, 1) / 4d) * 98d);
-        var requestedHeight = chromeVerticalInset + headerHeight + contentHeight + contentBottomInset;
-        return new Size(width, Math.Min(maxHeight, requestedHeight));
+        return CalculateLayout(itemCount, displayMode, openMode).WindowSize;
     }
+
+    public static GroupFlyoutLayout CalculateLayout(
+        int itemCount,
+        PanelFlyoutDisplayMode displayMode,
+        PanelGroupOpenMode openMode)
+    {
+        var workArea = SystemParameters.WorkArea;
+        var maxModalWidth = Math.Max(MinimumWindowWidth, Math.Floor(workArea.Width * 0.9));
+        var maxModalHeight = Math.Max(260, Math.Floor(workArea.Height * 0.9));
+        var normalizedCount = Math.Max(itemCount, 1);
+
+        if (displayMode == PanelFlyoutDisplayMode.List)
+        {
+            var width = Math.Min(maxModalWidth, openMode == PanelGroupOpenMode.Floating ? 460d : 420d);
+            var requestedHeight = FixedVerticalSize + Math.Max(90, normalizedCount * 66d);
+            return new GroupFlyoutLayout(
+                new Size(width, Math.Min(maxModalHeight, requestedHeight)),
+                1,
+                normalizedCount,
+                Math.Max(1, width - ChromeHorizontalInset),
+                Math.Max(90, requestedHeight - FixedVerticalSize),
+                requestedHeight > maxModalHeight);
+        }
+
+        var maximumColumns = Math.Max(
+            1,
+            (int)Math.Floor((maxModalWidth - ChromeHorizontalInset) / TileSlotWidth));
+        var maximumVisibleRows = Math.Max(
+            1,
+            (int)Math.Floor((maxModalHeight - FixedVerticalSize) / TileSlotHeight));
+        var fullLayouts = new List<GroupFlyoutLayoutCandidate>();
+        var scrollingLayouts = new List<GroupFlyoutLayoutCandidate>();
+
+        for (var columns = 1; columns <= maximumColumns; columns++)
+        {
+            var rows = (int)Math.Ceiling(normalizedCount / (double)columns);
+            var needsScroll = rows > maximumVisibleRows;
+            var visibleRows = needsScroll ? maximumVisibleRows : rows;
+            var gridWidth = columns * TileSlotWidth;
+            var gridHeight = visibleRows * TileSlotHeight;
+            var viewportWidth = gridWidth + (needsScroll ? ScrollBarWidth : 0);
+            var modalWidth = Math.Max(MinimumWindowWidth, ChromeHorizontalInset + viewportWidth);
+            var modalHeight = Math.Min(maxModalHeight, FixedVerticalSize + gridHeight);
+            if (modalWidth > maxModalWidth || modalHeight > maxModalHeight)
+            {
+                continue;
+            }
+
+            var candidate = new GroupFlyoutLayoutCandidate(
+                columns,
+                rows,
+                visibleRows,
+                gridWidth,
+                gridHeight,
+                modalWidth,
+                modalHeight,
+                needsScroll,
+                CalculateVisualScore(normalizedCount, columns, rows, visibleRows, modalWidth, modalHeight, needsScroll));
+            (needsScroll ? scrollingLayouts : fullLayouts).Add(candidate);
+        }
+
+        var candidates = fullLayouts.Count > 0 ? fullLayouts : scrollingLayouts;
+        var best = candidates
+            .OrderBy(candidate => candidate.Score)
+            .ThenBy(candidate => candidate.Columns)
+            .First();
+
+        return new GroupFlyoutLayout(
+            new Size(best.ModalWidth, best.ModalHeight),
+            best.Columns,
+            best.Rows,
+            best.GridWidth,
+            best.GridHeight,
+            best.NeedsScroll);
+    }
+
+    private const double TileSlotWidth = 104d;
+    private const double TileSlotHeight = 106d;
+    private const double ScrollBarWidth = 8d;
+    private const double MinimumWindowWidth = 280d;
+    private const double ChromeHorizontalInset = 60d;
+    private const double FixedVerticalSize = 121d;
+    private const double TargetAspectRatio = 1.25d;
+
+    private static double CalculateVisualScore(
+        int itemCount,
+        int columns,
+        int rows,
+        int visibleRows,
+        double modalWidth,
+        double modalHeight,
+        bool needsScroll)
+    {
+        var aspectRatio = modalWidth / modalHeight;
+        var aspectScore = Math.Abs(Math.Log(aspectRatio / TargetAspectRatio)) * 8;
+        var shapeScore = Math.Abs(Math.Log(columns / (double)visibleRows)) * 0.75;
+        var elongationScore = aspectRatio switch
+        {
+            < 0.75 => (0.75 - aspectRatio) * 12,
+            > 2 => (aspectRatio - 2) * 8,
+            _ => 0
+        };
+
+        var emptyCells = columns * rows - itemCount;
+        var emptyCellScore = needsScroll ? 0 : emptyCells / (double)(columns * rows) * 4;
+        var lastRowItems = itemCount - columns * (rows - 1);
+        var weakLastRowScore = !needsScroll && lastRowItems * 2 < columns ? 6 : 0;
+        return aspectScore + shapeScore + elongationScore + emptyCellScore + weakLastRowScore;
+    }
+
+    private sealed record GroupFlyoutLayoutCandidate(
+        int Columns,
+        int Rows,
+        int VisibleRows,
+        double GridWidth,
+        double GridHeight,
+        double ModalWidth,
+        double ModalHeight,
+        bool NeedsScroll,
+        double Score);
 
     private Task LaunchItemAsync(GroupFlyoutItemViewModel item)
     {

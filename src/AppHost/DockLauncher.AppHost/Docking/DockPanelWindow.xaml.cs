@@ -28,6 +28,11 @@ public partial class DockPanelWindow : Window
     private const int HtBottom = 15;
     private const int HtBottomLeft = 16;
     private const int HtBottomRight = 17;
+    private static readonly IntPtr HwndTopmost = new(-1);
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpNoOwnerZOrder = 0x0200;
 
     private double _restingOpacity;
     private readonly DispatcherTimer _autoHideTimer;
@@ -85,6 +90,7 @@ public partial class DockPanelWindow : Window
     {
         _hwndSource = (HwndSource?)PresentationSource.FromVisual(this);
         _hwndSource?.AddHook(WndProc);
+        ApplyTopmostState();
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -208,7 +214,7 @@ public partial class DockPanelWindow : Window
 
         if (DataContext is DockPanelWindowViewModel viewModel)
         {
-            Topmost = viewModel.IsTopmost;
+            ApplyTopmostState(viewModel);
             if (IsLoaded)
             {
                 ApplyWindowState(viewModel, preserveRevealState: true);
@@ -346,7 +352,7 @@ public partial class DockPanelWindow : Window
             Height = viewModel.WindowHeight;
             Left = viewModel.Left;
             Top = viewModel.Top;
-            Topmost = viewModel.IsTopmost;
+            ApplyTopmostState(viewModel);
         }
         finally
         {
@@ -366,7 +372,7 @@ public partial class DockPanelWindow : Window
         {
             Width = viewModel.WindowWidth;
             Height = viewModel.WindowHeight;
-            Topmost = viewModel.IsTopmost;
+            ApplyTopmostState(viewModel);
         }
         finally
         {
@@ -440,6 +446,36 @@ public partial class DockPanelWindow : Window
         BeginAnimation(LeftProperty, null);
         BeginAnimation(TopProperty, null);
         BeginAnimation(OpacityProperty, null);
+    }
+
+    private void ApplyTopmostState()
+    {
+        if (DataContext is DockPanelWindowViewModel viewModel)
+        {
+            ApplyTopmostState(viewModel);
+        }
+    }
+
+    private void ApplyTopmostState(DockPanelWindowViewModel viewModel)
+    {
+        Topmost = viewModel.IsTopmost;
+        if (!viewModel.IsTopmost)
+        {
+            return;
+        }
+
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle != IntPtr.Zero)
+        {
+            SetWindowPos(
+                handle,
+                HwndTopmost,
+                0,
+                0,
+                0,
+                0,
+                SwpNoMove | SwpNoSize | SwpNoActivate | SwpNoOwnerZOrder);
+        }
     }
 
     private static DoubleAnimation CreateWindowAnimation(double target, TimeSpan duration, IEasingFunction easing)
@@ -965,6 +1001,16 @@ public partial class DockPanelWindow : Window
 
     [DllImport("user32.dll")]
     private static extern bool GetCursorPos(out NativePoint lpPoint);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
 
     private struct NativePoint
     {

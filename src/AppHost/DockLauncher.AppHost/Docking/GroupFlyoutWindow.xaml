@@ -24,6 +24,7 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
@@ -94,26 +95,39 @@
                 </Border>
             </Grid>
 
-            <ListBox Grid.Row="1"
-                     Padding="0,2,0,0"
+            <Border Grid.Row="1"
+                    Height="1"
+                    Margin="0,0,0,8"
+                    Background="#3346C5F0"
+                    SnapsToDevicePixels="True" />
+
+            <ListBox Grid.Row="2"
+                     Width="{Binding TileViewportWidth}"
+                     HorizontalAlignment="Center"
+                     Padding="0"
+                     BorderThickness="0"
+                     Background="Transparent"
                      ItemsSource="{Binding Items}"
                      Visibility="{Binding TilesVisibility}"
-                     ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                     ScrollViewer.VerticalScrollBarVisibility="{Binding TileVerticalScrollBarVisibility}"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListBox.Resources>
                     <Style TargetType="ScrollBar" BasedOn="{StaticResource FlyoutScrollBarStyle}" />
                 </ListBox.Resources>
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <WrapPanel ItemWidth="96"
-                                   ItemHeight="98" />
+                        <UniformGrid Width="{Binding DataContext.TileGridWidth, RelativeSource={RelativeSource AncestorType=Window}}"
+                                     Columns="{Binding DataContext.TileColumns, RelativeSource={RelativeSource AncestorType=Window}}" />
                     </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="Padding" Value="0" />
+                        <Setter Property="Width" Value="104" />
+                        <Setter Property="Height" Value="106" />
                         <Setter Property="Focusable" Value="False" />
                         <Setter Property="HorizontalContentAlignment" Value="Center" />
+                        <Setter Property="VerticalContentAlignment" Value="Center" />
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="ListBoxItem">
@@ -179,10 +193,10 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-            <ListBox Grid.Row="1"
+            <ListBox Grid.Row="2"
                      ItemsSource="{Binding Items}"
                      Visibility="{Binding ListVisibility}"
-                     ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <ListBox.Resources>
                     <Style TargetType="ScrollBar" BasedOn="{StaticResource FlyoutScrollBarStyle}" />
