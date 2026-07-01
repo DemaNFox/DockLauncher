@@ -735,6 +735,14 @@ public sealed class DockShellCoordinator : IDockShellController
             : (effectivePanelPaddingVertical * 2) + verticalItemExtent + overflowPrimaryGutter + chromeAllowance;
         var width = Math.Clamp(panel.Appearance.CustomWidth ?? expandedWidth, minWidth, maxPanelWidth);
         var height = Math.Clamp(panel.Appearance.CustomHeight ?? expandedHeight, minHeight, maxPanelHeight);
+        if (orientation == Orientation.Horizontal)
+        {
+            height = Math.Min(height, expandedHeight);
+        }
+        else
+        {
+            width = Math.Min(width, expandedWidth);
+        }
         var horizontalScrollEnabled = orientation == Orientation.Horizontal && overflowActive;
         var verticalScrollEnabled = orientation == Orientation.Vertical && overflowActive;
         var centeredLeft = workArea.Left + Math.Max(0, (workArea.Width - width) / 2);
@@ -854,6 +862,12 @@ public sealed class DockShellCoordinator : IDockShellController
                 primaryVisibleSlots,
                 overflowActive)
         };
+    }
+
+    internal static Size CalculatePanelWindowSize(Modules.Panels.Domain.Panel panel, int itemCount)
+    {
+        var metrics = CalculateMetrics(panel, itemCount);
+        return new Size(metrics.Width, metrics.Height);
     }
 
     private static double ResolveDockLeft(Modules.Panels.Domain.Panel panel, Rect workArea, double width, double centeredLeft)
@@ -1244,7 +1258,7 @@ public sealed class DockShellCoordinator : IDockShellController
             && !item.Target.StartsWith("action:", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static Modules.Panels.Domain.Panel ClonePanelWithPosition(
+    internal static Modules.Panels.Domain.Panel ClonePanelWithPosition(
         Modules.Panels.Domain.Panel panel,
         Modules.Panels.Domain.PanelPosition position,
         double? floatingLeft,
@@ -1252,6 +1266,10 @@ public sealed class DockShellCoordinator : IDockShellController
         double? customWidth,
         double? customHeight)
     {
+        var resetDockedSize = position == Modules.Panels.Domain.PanelPosition.Floating
+            && panel.Position != Modules.Panels.Domain.PanelPosition.Floating
+            && customWidth is null
+            && customHeight is null;
         var clone = new Modules.Panels.Domain.Panel(
             panel.Id,
             panel.Name,
@@ -1261,8 +1279,8 @@ public sealed class DockShellCoordinator : IDockShellController
             {
                 FloatingLeft = position == Modules.Panels.Domain.PanelPosition.Floating ? floatingLeft : panel.Appearance.FloatingLeft,
                 FloatingTop = position == Modules.Panels.Domain.PanelPosition.Floating ? floatingTop : panel.Appearance.FloatingTop,
-                CustomWidth = customWidth ?? panel.Appearance.CustomWidth,
-                CustomHeight = customHeight ?? panel.Appearance.CustomHeight
+                CustomWidth = resetDockedSize ? null : customWidth ?? panel.Appearance.CustomWidth,
+                CustomHeight = resetDockedSize ? null : customHeight ?? panel.Appearance.CustomHeight
             });
 
         foreach (var itemId in panel.ItemIds)

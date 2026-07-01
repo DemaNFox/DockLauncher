@@ -224,6 +224,29 @@ The new dialog was opened modally while the window XAML still requested `WindowS
 - `src/AppHost/DockLauncher.AppHost/Docking/GroupFlyoutWindowViewModel.cs`
 - `src/Tests/DockLauncher.UiSmoke.Tests/AppShellTests.cs`
 
+## 2026-07-01: Undocked side panel kept its docked height
+
+### Symptoms
+
+- Dragging a panel away from the left or right edge produced an extremely tall floating panel with a large empty area.
+- Restarting the application could preserve the oversized panel.
+
+### Root cause
+
+The drag handler persisted the docked window's current `ActualWidth` and `ActualHeight` as the floating panel's custom size. When an implicitly vertical side panel became horizontal in floating mode, its long primary-axis height became the horizontal panel's cross-axis height.
+
+### Fix
+
+- Do not carry custom window dimensions across a docked-to-floating transition; let floating metrics recalculate from the items.
+- Clamp a panel's cross-axis dimension to its content-derived expanded size, which also repairs previously persisted oversized floating panels.
+- Continue preserving explicit dimensions when an already-floating panel is moved or resized.
+
+### Files
+
+- `src/AppHost/DockLauncher.AppHost/Docking/DockPanelWindow.xaml.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/DockShellCoordinator.cs`
+- `src/Tests/DockLauncher.UiSmoke.Tests/AppShellTests.cs`
+
 ## Rule For New Issues
 
 When a new issue is resolved:

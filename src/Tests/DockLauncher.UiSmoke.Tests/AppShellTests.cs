@@ -237,6 +237,67 @@ public class AppShellTests
     }
 
     [Fact]
+    public void DockShellCoordinator_UndockingPanel_ShouldDiscardDockedWindowSize()
+    {
+        var panel = new Panel(
+            Guid.NewGuid(),
+            "Side Dock",
+            PanelPosition.Left,
+            PanelLayoutMode.IconWithLabel,
+            new PanelAppearance(
+                0.9,
+                48,
+                true,
+                false,
+                false,
+                CustomWidth: 460,
+                CustomHeight: 1200));
+        panel.AddItem(Guid.NewGuid());
+
+        var floatingPanel = DockShellCoordinator.ClonePanelWithPosition(
+            panel,
+            PanelPosition.Floating,
+            120,
+            80,
+            null,
+            null);
+
+        floatingPanel.Appearance.CustomWidth.Should().BeNull();
+        floatingPanel.Appearance.CustomHeight.Should().BeNull();
+        floatingPanel.Appearance.FloatingLeft.Should().Be(120);
+        floatingPanel.Appearance.FloatingTop.Should().Be(80);
+        floatingPanel.ItemIds.Should().Equal(panel.ItemIds);
+    }
+
+    [Fact]
+    public void DockShellCoordinator_FloatingHorizontalPanel_ShouldClampOversizedHeightToContent()
+    {
+        var panel = new Panel(
+            Guid.NewGuid(),
+            "Recovered Floating Dock",
+            PanelPosition.Floating,
+            PanelLayoutMode.IconWithLabel,
+            new PanelAppearance(
+                0.9,
+                48,
+                true,
+                false,
+                false,
+                Orientation: PanelOrientation.Horizontal,
+                CustomWidth: 460,
+                CustomHeight: 1200));
+        for (var index = 0; index < 6; index++)
+        {
+            panel.AddItem(Guid.NewGuid());
+        }
+
+        var size = DockShellCoordinator.CalculatePanelWindowSize(panel, panel.ItemIds.Count);
+
+        size.Width.Should().Be(460);
+        size.Height.Should().BeLessThan(200);
+    }
+
+    [Fact]
     public async Task WorkspaceEditor_ShouldAddDroppedPathsToSelectedPanel()
     {
         var panel = new Panel(Guid.NewGuid(), "Work", PanelPosition.Bottom, PanelLayoutMode.IconWithLabel, new PanelAppearance(0.9, 40, true, true, false));

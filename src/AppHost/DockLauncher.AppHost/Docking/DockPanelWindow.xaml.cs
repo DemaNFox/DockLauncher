@@ -505,6 +505,7 @@ public partial class DockPanelWindow : Window
         e.Handled = true;
         var initialLeft = Left;
         var initialTop = Top;
+        var wasFloating = _panelPosition == PanelPosition.Floating;
 
         try
         {
@@ -526,7 +527,12 @@ public partial class DockPanelWindow : Window
             _revealedLeft = Left;
             _revealedTop = Top;
             UpdateAutoHideAnchors();
-            await viewModel.UpdatePanelPositionAsync(PanelPosition.Floating, Left, Top, ActualWidth, ActualHeight);
+            await viewModel.UpdatePanelPositionAsync(
+                PanelPosition.Floating,
+                Left,
+                Top,
+                wasFloating ? ActualWidth : null,
+                wasFloating ? ActualHeight : null);
         }
     }
 
