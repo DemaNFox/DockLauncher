@@ -12,6 +12,33 @@
         WindowStyle="None"
         ResizeMode="NoResize"
         Topmost="True">
+    <Window.Resources>
+        <ContextMenu x:Key="GroupItemContextMenu"
+                     x:Shared="False"
+                     DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+            <MenuItem Command="{Binding LaunchCommand}" Header="Launch" />
+            <MenuItem Command="{Binding LaunchAsAdministratorCommand}" Header="Launch As Administrator" />
+            <Separator />
+            <MenuItem Command="{Binding EditCommand}" Header="Edit Item" />
+            <MenuItem Command="{Binding OpenLocationCommand}" Header="Open Location" />
+            <MenuItem Command="{Binding RenameCommand}" Header="Rename" />
+            <MenuItem Header="Move To Panel"
+                      ItemsSource="{Binding MoveTargets}"
+                      Visibility="{Binding MoveTargetsVisibility}">
+                <MenuItem.ItemContainerStyle>
+                    <Style TargetType="MenuItem">
+                        <Setter Property="Header" Value="{Binding PanelName}" />
+                        <Setter Property="Command"
+                                Value="{Binding PlacementTarget.DataContext.MoveToPanelCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                        <Setter Property="CommandParameter" Value="{Binding}" />
+                    </Style>
+                </MenuItem.ItemContainerStyle>
+            </MenuItem>
+            <MenuItem Command="{Binding DuplicateCommand}" Header="Duplicate Item" />
+            <MenuItem Command="{Binding DuplicateToNewPanelCommand}" Header="Duplicate To New Panel" />
+            <MenuItem Command="{Binding RemoveCommand}" Header="Remove From Group" />
+        </ContextMenu>
+    </Window.Resources>
     <Border x:Name="FlyoutChrome"
             Style="{StaticResource FlyoutChromeStyle}"
             RenderTransformOrigin="0.5,0">
@@ -142,15 +169,9 @@
                         <Button Style="{StaticResource FlyoutItemButtonStyle}"
                                 Width="96"
                                 Height="98"
-                                Command="{Binding LaunchCommand}">
-                            <Button.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Command="{Binding LaunchCommand}" Header="Launch" />
-                                    <MenuItem Command="{Binding LaunchAsAdministratorCommand}" Header="Launch As Administrator" />
-                                    <Separator />
-                                    <MenuItem Command="{Binding OpenLocationCommand}" Header="Open Location" />
-                                </ContextMenu>
-                            </Button.ContextMenu>
+                                Command="{Binding LaunchCommand}"
+                                ContextMenu="{StaticResource GroupItemContextMenu}"
+                                PreviewMouseRightButtonDown="OnItemPreviewMouseRightButtonDown">
                             <Grid>
                                 <StackPanel HorizontalAlignment="Center"
                                             VerticalAlignment="Top"
@@ -218,7 +239,9 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Button Style="{StaticResource FlyoutItemButtonStyle}"
-                                Command="{Binding LaunchCommand}">
+                                Command="{Binding LaunchCommand}"
+                                ContextMenu="{StaticResource GroupItemContextMenu}"
+                                PreviewMouseRightButtonDown="OnItemPreviewMouseRightButtonDown">
                             <Border Style="{StaticResource FlyoutItemCardStyle}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>

@@ -139,7 +139,7 @@ public sealed class DockShellCoordinator : IDockShellController
 
         foreach (var window in _groupWindows.Values)
         {
-            window.Close();
+            window.CloseImmediately();
         }
 
         _groupWindows.Clear();
@@ -437,7 +437,7 @@ public sealed class DockShellCoordinator : IDockShellController
         {
             foreach (var window in _groupWindows.Values)
             {
-                window.Close();
+                window.CloseImmediately();
             }
 
             _groupWindows.Clear();
@@ -617,7 +617,7 @@ public sealed class DockShellCoordinator : IDockShellController
             panel.Position != Modules.Panels.Domain.PanelPosition.Floating && panel.Appearance.AutoHide,
             panel.Appearance.Locked,
             items,
-            item => ActivateDockItemAsync(item, workspace, metrics),
+            item => ActivateDockItemAsync(panel.Id, item, workspace, metrics),
             ShowConfigurator,
             () => RefreshAsync(),
             paths => AddPathsToPanelAsync(panel.Id, paths),
@@ -642,7 +642,7 @@ public sealed class DockShellCoordinator : IDockShellController
             () => DecreasePanelIconSizeAsync(panel.Id),
             OpenItemLocationAsync,
             item => DuplicateItemOnPanelAsync(panel.Id, item),
-            item => DuplicateItemToNewPanelAsync(panel.Id, item),
+            item => DuplicateItemToNewPanelAsync(panel.Id, item.Id),
             item => RemoveItemFromPanelAsync(panel.Id, item.Id),
             item => RenameItemAsync(item.Id, item.DisplayName),
             item => EditItemAsync(item.Id),
@@ -937,7 +937,7 @@ public sealed class DockShellCoordinator : IDockShellController
         int PrimaryVisibleSlots,
         bool OverflowActive);
 
-    private async Task ActivateDockItemAsync(DockPanelItemViewModel item, Workspace workspace, PanelMetrics panelMetrics)
+    private async Task ActivateDockItemAsync(Guid sourcePanelId, DockPanelItemViewModel item, Workspace workspace, PanelMetrics panelMetrics)
     {
         if (item.Type == LauncherItemType.Separator)
         {
@@ -946,7 +946,7 @@ public sealed class DockShellCoordinator : IDockShellController
 
         if (TryParseGroupTarget(item.Target, out var groupId))
         {
-            ShowGroupFlyout(groupId, item.IconSource, workspace, panelMetrics);
+            ShowGroupFlyout(sourcePanelId, groupId, item.IconSource, workspace, panelMetrics);
             return;
         }
 
@@ -971,7 +971,12 @@ public sealed class DockShellCoordinator : IDockShellController
         await _launchItemCommandHandler.HandleAsync(new LaunchItemCommand(launcherItem), CancellationToken.None);
     }
 
-    private void ShowGroupFlyout(Guid groupId, System.Windows.Media.ImageSource? groupIconSource, Workspace workspace, PanelMetrics panelMetrics)
+    private void ShowGroupFlyout(
+        Guid sourcePanelId,
+        Guid groupId,
+        System.Windows.Media.ImageSource? groupIconSource,
+        Workspace workspace,
+        PanelMetrics panelMetrics)
     {
         var group = workspace.Groups.FirstOrDefault(candidate => candidate.Id == groupId);
         if (group is null)
@@ -981,6 +986,9 @@ public sealed class DockShellCoordinator : IDockShellController
 
         CloseFlyoutWindows();
 
+        var moveTargets = workspace.Panels
+            .Select(panel => new DockPanelMoveTargetViewModel(panel.Id, panel.Name))
+            .ToArray();
         var items = group.ItemIds
             .Select(itemId => workspace.Items.FirstOrDefault(item => item.Id == itemId))
             .Where(item => item is not null)
@@ -989,7 +997,8 @@ public sealed class DockShellCoordinator : IDockShellController
                 item.DisplayName,
                 item.Target,
                 _iconProvider.GetIcon(item.Type, item.Target),
-                item.Type.ToString()))
+                item.Type.ToString(),
+                moveTargets))
             .ToArray();
 
         var flyoutSize = GroupFlyoutWindowViewModel.CalculateWindowSize(
@@ -1027,7 +1036,13 @@ public sealed class DockShellCoordinator : IDockShellController
                 var elevatedItem = new LauncherItem(item.Id, item.DisplayName, item.Type, item.Target, item.Arguments, true);
                 await _launchItemCommandHandler.HandleAsync(new LaunchItemCommand(elevatedItem), CancellationToken.None);
             },
-            OpenGroupItemLocationAsync);
+            OpenGroupItemLocationAsync,
+            item => DuplicateItemInGroupAsync(groupId, item.Id),
+            item => DuplicateItemToNewPanelAsync(sourcePanelId, item.Id),
+            item => RemoveItemFromGroupAsync(groupId, item.Id),
+            item => RenameItemAsync(item.Id, item.DisplayName),
+            item => EditItemAsync(item.Id),
+            (item, target) => MoveItemFromGroupToPanelAsync(groupId, item.Id, target.PanelId));
 
         var window = new GroupFlyoutWindow(viewModel);
         window.Closed += (_, _) => _groupWindows.Remove(groupId);
@@ -1063,7 +1078,7 @@ public sealed class DockShellCoordinator : IDockShellController
     {
         foreach (var window in _groupWindows.Values.ToArray())
         {
-            window.Close();
+            window.CloseImmediately();
         }
 
         _groupWindows.Clear();
@@ -1352,6 +1367,71 @@ public sealed class DockShellCoordinator : IDockShellController
             workspace.LaunchProfiles);
 
         await CommitRuntimeWorkspaceAsync(updatedWorkspace, "Item removed from panel.", cancellationToken);
+    }
+
+    private async Task DuplicateItemInGroupAsync(Guid groupId, Guid itemId, CancellationToken cancellationToken = default)
+    {
+        var workspace = await LoadRuntimeWorkspaceAsync(cancellationToken);
+        var sourceItem = workspace.Items.FirstOrDefault(candidate => candidate.Id == itemId);
+        var sourceGroup = workspace.Groups.FirstOrDefault(candidate => candidate.Id == groupId);
+        if (sourceItem is null || sourceGroup is null)
+        {
+            return;
+        }
+
+        var duplicatedItem = new LauncherItem(
+            Guid.NewGuid(),
+            $"{sourceItem.DisplayName} Copy",
+            sourceItem.Type,
+            sourceItem.Target,
+            sourceItem.Arguments,
+            sourceItem.RunAsAdministrator,
+            sourceItem.IconPath);
+        var updatedGroups = workspace.Groups
+            .Select(group => group.Id == groupId
+                ? CloneGroupWithItems(group, InsertAfter(group.ItemIds, itemId, duplicatedItem.Id))
+                : CloneGroupWithItems(group, group.ItemIds))
+            .ToArray();
+        var updatedWorkspace = new Workspace(
+            workspace.SchemaVersion,
+            workspace.Settings,
+            workspace.Panels,
+            workspace.Items.Concat([duplicatedItem]).ToArray(),
+            updatedGroups,
+            workspace.LaunchProfiles);
+
+        await CommitRuntimeWorkspaceAsync(updatedWorkspace, $"Item '{sourceItem.DisplayName}' duplicated in group.", cancellationToken);
+    }
+
+    private async Task RemoveItemFromGroupAsync(Guid groupId, Guid itemId, CancellationToken cancellationToken = default)
+    {
+        var workspace = await LoadRuntimeWorkspaceAsync(cancellationToken);
+        var sourceGroup = workspace.Groups.FirstOrDefault(group => group.Id == groupId);
+        if (sourceGroup is null || !sourceGroup.ItemIds.Contains(itemId))
+        {
+            return;
+        }
+
+        var updatedGroups = workspace.Groups
+            .Select(group => group.Id == groupId
+                ? CloneGroupWithItems(group, group.ItemIds.Where(existingId => existingId != itemId))
+                : CloneGroupWithItems(group, group.ItemIds))
+            .ToArray();
+        var stillReferenced = workspace.Panels.Any(panel => panel.ItemIds.Contains(itemId))
+            || updatedGroups.Any(group => group.ItemIds.Contains(itemId))
+            || workspace.LaunchProfiles.Any(profile => profile.Steps.Any(step => step.ItemId == itemId));
+        var updatedItems = stillReferenced
+            ? workspace.Items
+            : workspace.Items.Where(item => item.Id != itemId).ToArray();
+        var updatedWorkspace = new Workspace(
+            workspace.SchemaVersion,
+            workspace.Settings,
+            workspace.Panels,
+            updatedItems,
+            updatedGroups,
+            workspace.LaunchProfiles);
+
+        await CommitRuntimeWorkspaceAsync(updatedWorkspace, "Item removed from group.", cancellationToken);
     }
 
     private async Task RenameItemAsync(Guid itemId, string currentDisplayName, CancellationToken cancellationToken = default)
@@ -1767,11 +1847,11 @@ public sealed class DockShellCoordinator : IDockShellController
         await CommitRuntimeWorkspaceAsync(updatedWorkspace, "Panel settings updated from runtime panel.", cancellationToken);
     }
 
-    private async Task DuplicateItemToNewPanelAsync(Guid sourcePanelId, DockPanelItemViewModel item, CancellationToken cancellationToken = default)
+    private async Task DuplicateItemToNewPanelAsync(Guid sourcePanelId, Guid itemId, CancellationToken cancellationToken = default)
     {
         var workspace = await LoadRuntimeWorkspaceAsync(cancellationToken);
         var sourcePanel = workspace.Panels.FirstOrDefault(panel => panel.Id == sourcePanelId);
-        var sourceItem = workspace.Items.FirstOrDefault(candidate => candidate.Id == item.Id);
+        var sourceItem = workspace.Items.FirstOrDefault(candidate => candidate.Id == itemId);
         if (sourcePanel is null || sourceItem is null)
         {
             return;
@@ -1803,6 +1883,44 @@ public sealed class DockShellCoordinator : IDockShellController
             workspace.LaunchProfiles);
 
         await CommitRuntimeWorkspaceAsync(updatedWorkspace, $"Item '{sourceItem.DisplayName}' duplicated to a new panel.", cancellationToken);
+    }
+
+    private async Task MoveItemFromGroupToPanelAsync(
+        Guid sourceGroupId,
+        Guid itemId,
+        Guid targetPanelId,
+        CancellationToken cancellationToken = default)
+    {
+        var workspace = await LoadRuntimeWorkspaceAsync(cancellationToken);
+        var sourceGroup = workspace.Groups.FirstOrDefault(group => group.Id == sourceGroupId);
+        var targetPanel = workspace.Panels.FirstOrDefault(panel => panel.Id == targetPanelId);
+        if (sourceGroup is null
+            || targetPanel is null
+            || !sourceGroup.ItemIds.Contains(itemId)
+            || workspace.Items.All(item => item.Id != itemId))
+        {
+            return;
+        }
+
+        var updatedGroups = workspace.Groups
+            .Select(group => group.Id == sourceGroupId
+                ? CloneGroupWithItems(group, group.ItemIds.Where(existingId => existingId != itemId))
+                : CloneGroupWithItems(group, group.ItemIds))
+            .ToArray();
+        var updatedPanels = workspace.Panels
+            .Select(panel => panel.Id == targetPanelId
+                ? ClonePanelWithItems(panel, panel.ItemIds.Concat([itemId]).Distinct())
+                : ClonePanelWithItems(panel, panel.ItemIds))
+            .ToArray();
+        var updatedWorkspace = new Workspace(
+            workspace.SchemaVersion,
+            workspace.Settings,
+            updatedPanels,
+            workspace.Items,
+            updatedGroups,
+            workspace.LaunchProfiles);
+
+        await CommitRuntimeWorkspaceAsync(updatedWorkspace, "Item moved from group to panel.", cancellationToken);
     }
 
     private async Task MoveItemToPanelAsync(Guid sourcePanelId, Guid itemId, Guid targetPanelId, CancellationToken cancellationToken = default)
@@ -1886,6 +2004,17 @@ public sealed class DockShellCoordinator : IDockShellController
     private static Modules.Panels.Domain.Panel ClonePanelWithItems(Modules.Panels.Domain.Panel panel, IEnumerable<Guid> itemIds)
     {
         return ClonePanel(panel, panel.Name, panel.Position, panel.LayoutMode, panel.Appearance, itemIds);
+    }
+
+    private static Group CloneGroupWithItems(Group group, IEnumerable<Guid> itemIds)
+    {
+        var clone = new Group(group.Id, group.Name);
+        foreach (var itemId in itemIds)
+        {
+            clone.AddItem(itemId);
+        }
+
+        return clone;
     }
 
     private static Modules.Panels.Domain.Panel ClonePanel(

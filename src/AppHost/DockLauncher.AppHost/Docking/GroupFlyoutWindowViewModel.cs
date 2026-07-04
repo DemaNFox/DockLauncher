@@ -20,6 +20,12 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
     private readonly Func<GroupFlyoutItemViewModel, Task> _launchAsync;
     private readonly Func<GroupFlyoutItemViewModel, Task> _launchAsAdministratorAsync;
     private readonly Func<GroupFlyoutItemViewModel, Task> _openLocationAsync;
+    private readonly Func<GroupFlyoutItemViewModel, Task> _duplicateAsync;
+    private readonly Func<GroupFlyoutItemViewModel, Task> _duplicateToNewPanelAsync;
+    private readonly Func<GroupFlyoutItemViewModel, Task> _removeAsync;
+    private readonly Func<GroupFlyoutItemViewModel, Task> _renameAsync;
+    private readonly Func<GroupFlyoutItemViewModel, Task> _editAsync;
+    private readonly Func<GroupFlyoutItemViewModel, DockPanelMoveTargetViewModel, Task> _moveToPanelAsync;
 
     public GroupFlyoutWindowViewModel(
         string title,
@@ -32,7 +38,13 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
         IReadOnlyList<GroupFlyoutItemViewModel> items,
         Func<GroupFlyoutItemViewModel, Task> launchAsync,
         Func<GroupFlyoutItemViewModel, Task> launchAsAdministratorAsync,
-        Func<GroupFlyoutItemViewModel, Task> openLocationAsync)
+        Func<GroupFlyoutItemViewModel, Task> openLocationAsync,
+        Func<GroupFlyoutItemViewModel, Task> duplicateAsync,
+        Func<GroupFlyoutItemViewModel, Task> duplicateToNewPanelAsync,
+        Func<GroupFlyoutItemViewModel, Task> removeAsync,
+        Func<GroupFlyoutItemViewModel, Task> renameAsync,
+        Func<GroupFlyoutItemViewModel, Task> editAsync,
+        Func<GroupFlyoutItemViewModel, DockPanelMoveTargetViewModel, Task> moveToPanelAsync)
     {
         Title = title.Trim();
         GroupIconSource = groupIconSource;
@@ -54,11 +66,25 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
         _launchAsync = launchAsync;
         _launchAsAdministratorAsync = launchAsAdministratorAsync;
         _openLocationAsync = openLocationAsync;
+        _duplicateAsync = duplicateAsync;
+        _duplicateToNewPanelAsync = duplicateToNewPanelAsync;
+        _removeAsync = removeAsync;
+        _renameAsync = renameAsync;
+        _editAsync = editAsync;
+        _moveToPanelAsync = moveToPanelAsync;
 
         foreach (var item in Items)
         {
             item.AttachLauncher(LaunchItemAsync);
-            item.AttachContextActions(LaunchItemAsAdministratorAsync, OpenLocationAsync);
+            item.AttachContextActions(
+                LaunchItemAsAdministratorAsync,
+                OpenLocationAsync,
+                DuplicateAsync,
+                DuplicateToNewPanelAsync,
+                RemoveAsync,
+                RenameAsync,
+                EditAsync,
+                MoveToPanelAsync);
         }
     }
 
@@ -250,6 +276,19 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
     {
         return _openLocationAsync(item);
     }
+
+    private Task DuplicateAsync(GroupFlyoutItemViewModel item) => _duplicateAsync(item);
+
+    private Task DuplicateToNewPanelAsync(GroupFlyoutItemViewModel item) => _duplicateToNewPanelAsync(item);
+
+    private Task RemoveAsync(GroupFlyoutItemViewModel item) => _removeAsync(item);
+
+    private Task RenameAsync(GroupFlyoutItemViewModel item) => _renameAsync(item);
+
+    private Task EditAsync(GroupFlyoutItemViewModel item) => _editAsync(item);
+
+    private Task MoveToPanelAsync(GroupFlyoutItemViewModel item, DockPanelMoveTargetViewModel target) =>
+        _moveToPanelAsync(item, target);
 }
 
 public sealed partial class GroupFlyoutItemViewModel : ObservableObject
@@ -257,14 +296,27 @@ public sealed partial class GroupFlyoutItemViewModel : ObservableObject
     private Func<GroupFlyoutItemViewModel, Task>? _launchAsync;
     private Func<GroupFlyoutItemViewModel, Task>? _launchAsAdministratorAsync;
     private Func<GroupFlyoutItemViewModel, Task>? _openLocationAsync;
+    private Func<GroupFlyoutItemViewModel, Task>? _duplicateAsync;
+    private Func<GroupFlyoutItemViewModel, Task>? _duplicateToNewPanelAsync;
+    private Func<GroupFlyoutItemViewModel, Task>? _removeAsync;
+    private Func<GroupFlyoutItemViewModel, Task>? _renameAsync;
+    private Func<GroupFlyoutItemViewModel, Task>? _editAsync;
+    private Func<GroupFlyoutItemViewModel, DockPanelMoveTargetViewModel, Task>? _moveToPanelAsync;
 
-    public GroupFlyoutItemViewModel(Guid id, string displayName, string target, ImageSource? iconSource, string kindLabel)
+    public GroupFlyoutItemViewModel(
+        Guid id,
+        string displayName,
+        string target,
+        ImageSource? iconSource,
+        string kindLabel,
+        IReadOnlyList<DockPanelMoveTargetViewModel>? moveTargets = null)
     {
         Id = id;
         DisplayName = displayName;
         Target = target;
         IconSource = iconSource;
         KindLabel = kindLabel;
+        MoveTargets = moveTargets ?? [];
     }
 
     public Guid Id { get; }
@@ -276,6 +328,10 @@ public sealed partial class GroupFlyoutItemViewModel : ObservableObject
     public string KindLabel { get; }
 
     public ImageSource? IconSource { get; }
+
+    public IReadOnlyList<DockPanelMoveTargetViewModel> MoveTargets { get; }
+
+    public Visibility MoveTargetsVisibility => MoveTargets.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
 
     public Visibility IconVisibility => IconSource is null ? Visibility.Collapsed : Visibility.Visible;
 
@@ -310,10 +366,22 @@ public sealed partial class GroupFlyoutItemViewModel : ObservableObject
 
     public void AttachContextActions(
         Func<GroupFlyoutItemViewModel, Task> launchAsAdministratorAsync,
-        Func<GroupFlyoutItemViewModel, Task> openLocationAsync)
+        Func<GroupFlyoutItemViewModel, Task> openLocationAsync,
+        Func<GroupFlyoutItemViewModel, Task> duplicateAsync,
+        Func<GroupFlyoutItemViewModel, Task> duplicateToNewPanelAsync,
+        Func<GroupFlyoutItemViewModel, Task> removeAsync,
+        Func<GroupFlyoutItemViewModel, Task> renameAsync,
+        Func<GroupFlyoutItemViewModel, Task> editAsync,
+        Func<GroupFlyoutItemViewModel, DockPanelMoveTargetViewModel, Task> moveToPanelAsync)
     {
         _launchAsAdministratorAsync = launchAsAdministratorAsync;
         _openLocationAsync = openLocationAsync;
+        _duplicateAsync = duplicateAsync;
+        _duplicateToNewPanelAsync = duplicateToNewPanelAsync;
+        _removeAsync = removeAsync;
+        _renameAsync = renameAsync;
+        _editAsync = editAsync;
+        _moveToPanelAsync = moveToPanelAsync;
     }
 
     [RelayCommand]
@@ -333,6 +401,26 @@ public sealed partial class GroupFlyoutItemViewModel : ObservableObject
     {
         return _openLocationAsync is null ? Task.CompletedTask : _openLocationAsync(this);
     }
+
+    [RelayCommand]
+    private Task DuplicateAsync() => _duplicateAsync is null ? Task.CompletedTask : _duplicateAsync(this);
+
+    [RelayCommand]
+    private Task DuplicateToNewPanelAsync() =>
+        _duplicateToNewPanelAsync is null ? Task.CompletedTask : _duplicateToNewPanelAsync(this);
+
+    [RelayCommand]
+    private Task RemoveAsync() => _removeAsync is null ? Task.CompletedTask : _removeAsync(this);
+
+    [RelayCommand]
+    private Task RenameAsync() => _renameAsync is null ? Task.CompletedTask : _renameAsync(this);
+
+    [RelayCommand]
+    private Task EditAsync() => _editAsync is null ? Task.CompletedTask : _editAsync(this);
+
+    [RelayCommand]
+    private Task MoveToPanelAsync(DockPanelMoveTargetViewModel? target) =>
+        _moveToPanelAsync is null || target is null ? Task.CompletedTask : _moveToPanelAsync(this, target);
 
     private static Brush CreateBrush(string color)
     {

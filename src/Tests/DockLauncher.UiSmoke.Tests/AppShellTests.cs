@@ -906,6 +906,13 @@ public class AppShellTests
         var launched = false;
         var launchedAsAdmin = false;
         var openedLocation = false;
+        var duplicated = false;
+        var duplicatedToNewPanel = false;
+        var removed = false;
+        var renamed = false;
+        var edited = false;
+        var moved = false;
+        var moveTarget = new DockLauncher.AppHost.Docking.DockPanelMoveTargetViewModel(Guid.NewGuid(), "Work");
 
         item.AttachLauncher(_ =>
         {
@@ -923,15 +930,57 @@ public class AppShellTests
             {
                 openedLocation = true;
                 return Task.CompletedTask;
+            },
+            _ =>
+            {
+                duplicated = true;
+                return Task.CompletedTask;
+            },
+            _ =>
+            {
+                duplicatedToNewPanel = true;
+                return Task.CompletedTask;
+            },
+            _ =>
+            {
+                removed = true;
+                return Task.CompletedTask;
+            },
+            _ =>
+            {
+                renamed = true;
+                return Task.CompletedTask;
+            },
+            _ =>
+            {
+                edited = true;
+                return Task.CompletedTask;
+            },
+            (_, target) =>
+            {
+                moved = target == moveTarget;
+                return Task.CompletedTask;
             });
 
         await item.LaunchCommand.ExecuteAsync(null);
         await item.LaunchAsAdministratorCommand.ExecuteAsync(null);
         await item.OpenLocationCommand.ExecuteAsync(null);
+        await item.DuplicateCommand.ExecuteAsync(null);
+        await item.DuplicateToNewPanelCommand.ExecuteAsync(null);
+        await item.RemoveCommand.ExecuteAsync(null);
+        await item.RenameCommand.ExecuteAsync(null);
+        await item.EditCommand.ExecuteAsync(null);
+        await item.MoveToPanelCommand.ExecuteAsync(moveTarget);
 
         launched.Should().BeTrue();
         launchedAsAdmin.Should().BeTrue();
         openedLocation.Should().BeTrue();
+        duplicated.Should().BeTrue();
+        duplicatedToNewPanel.Should().BeTrue();
+        removed.Should().BeTrue();
+        renamed.Should().BeTrue();
+        edited.Should().BeTrue();
+        moved.Should().BeTrue();
     }
 
     [Fact]
@@ -1077,6 +1126,20 @@ public class AppShellTests
             new System.Windows.Rect(0, 0, 1920, 1080));
 
         placement.X.Should().BeGreaterThan(100);
+    }
+
+    [Fact]
+    public void DockFlyoutPlacement_ShouldOpenFloatingPanelFlyoutOutsidePanel()
+    {
+        var panelBounds = new System.Windows.Rect(12, 0, 390, 78);
+        var flyoutSize = new System.Windows.Size(456, 312);
+        var placement = DockLauncher.AppHost.Docking.DockFlyoutPlacement.Calculate(
+            PanelPosition.Floating,
+            panelBounds,
+            flyoutSize,
+            new System.Windows.Rect(0, 0, 1920, 1080));
+
+        placement.Y.Should().BeGreaterThanOrEqualTo(panelBounds.Bottom + 14);
     }
 
     private static DockLauncher.AppHost.Docking.DockPanelWindowViewModel CreateDockPanelWindowViewModelForOverflow(

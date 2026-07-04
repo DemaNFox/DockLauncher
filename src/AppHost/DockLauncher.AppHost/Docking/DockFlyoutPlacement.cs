@@ -33,8 +33,46 @@ public static class DockFlyoutPlacement
                 break;
             case PanelPosition.Floating:
             default:
-                left = panelBounds.Left + 24;
-                top = panelBounds.Top - 12;
+                var availableBelow = workArea.Bottom - margin - panelBounds.Bottom;
+                var availableAbove = panelBounds.Top - (workArea.Top + margin);
+                var availableRight = workArea.Right - margin - panelBounds.Right;
+                var availableLeft = panelBounds.Left - (workArea.Left + margin);
+
+                if (availableBelow >= flyoutSize.Height + gap)
+                {
+                    left = panelBounds.Left + (panelBounds.Width - flyoutSize.Width) / 2;
+                    top = panelBounds.Bottom + gap;
+                }
+                else if (availableAbove >= flyoutSize.Height + gap)
+                {
+                    left = panelBounds.Left + (panelBounds.Width - flyoutSize.Width) / 2;
+                    top = panelBounds.Top - flyoutSize.Height - gap;
+                }
+                else if (availableRight >= flyoutSize.Width + gap)
+                {
+                    left = panelBounds.Right + gap;
+                    top = panelBounds.Top + (panelBounds.Height - flyoutSize.Height) / 2;
+                }
+                else if (availableLeft >= flyoutSize.Width + gap)
+                {
+                    left = panelBounds.Left - flyoutSize.Width - gap;
+                    top = panelBounds.Top + (panelBounds.Height - flyoutSize.Height) / 2;
+                }
+                else if (Math.Max(availableBelow, availableAbove) >= Math.Max(availableRight, availableLeft))
+                {
+                    left = panelBounds.Left + (panelBounds.Width - flyoutSize.Width) / 2;
+                    top = availableBelow >= availableAbove
+                        ? panelBounds.Bottom + gap
+                        : panelBounds.Top - flyoutSize.Height - gap;
+                }
+                else
+                {
+                    left = availableRight >= availableLeft
+                        ? panelBounds.Right + gap
+                        : panelBounds.Left - flyoutSize.Width - gap;
+                    top = panelBounds.Top + (panelBounds.Height - flyoutSize.Height) / 2;
+                }
+
                 break;
         }
 

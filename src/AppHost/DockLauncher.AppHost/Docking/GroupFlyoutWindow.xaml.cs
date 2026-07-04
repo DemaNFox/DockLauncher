@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Controls;
 using DockLauncher.AppHost.Configuration;
 
 namespace DockLauncher.AppHost.Docking;
@@ -12,6 +13,7 @@ public partial class GroupFlyoutWindow : Window
 {
     private bool _closeAnimationStarted;
     private bool _allowClose;
+    private bool _hasOpenContextMenu;
 
     public GroupFlyoutWindow(GroupFlyoutWindowViewModel viewModel)
     {
@@ -22,6 +24,8 @@ public partial class GroupFlyoutWindow : Window
         Deactivated += OnDeactivated;
         Closing += OnClosing;
         KeyDown += OnKeyDown;
+        AddHandler(ContextMenuOpeningEvent, new ContextMenuEventHandler(OnContextMenuOpening), handledEventsToo: true);
+        AddHandler(ContextMenuClosingEvent, new ContextMenuEventHandler(OnContextMenuClosing), handledEventsToo: true);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -37,7 +41,43 @@ public partial class GroupFlyoutWindow : Window
 
     private void OnDeactivated(object? sender, EventArgs e)
     {
+        if (_hasOpenContextMenu)
+        {
+            return;
+        }
+
         BeginCloseAnimation();
+    }
+
+    private void OnItemPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement element || element.ContextMenu is not { } contextMenu)
+        {
+            return;
+        }
+
+        _hasOpenContextMenu = true;
+        contextMenu.DataContext = element.DataContext;
+        contextMenu.PlacementTarget = element;
+        contextMenu.Closed -= OnContextMenuClosed;
+        contextMenu.Closed += OnContextMenuClosed;
+        contextMenu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private void OnContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        _hasOpenContextMenu = true;
+    }
+
+    private void OnContextMenuClosing(object sender, ContextMenuEventArgs e)
+    {
+        _hasOpenContextMenu = false;
+    }
+
+    private void OnContextMenuClosed(object? sender, RoutedEventArgs e)
+    {
+        _hasOpenContextMenu = false;
     }
 
     private void OnKeyDown(object sender, KeyEventArgs e)
@@ -58,6 +98,14 @@ public partial class GroupFlyoutWindow : Window
 
         e.Cancel = true;
         BeginCloseAnimation();
+    }
+
+    public void CloseImmediately()
+    {
+        _allowClose = true;
+        BeginAnimation(OpacityProperty, null);
+        BeginAnimation(HeightProperty, null);
+        Close();
     }
 
     private void BeginOpenAnimation()
