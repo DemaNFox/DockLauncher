@@ -503,6 +503,25 @@ public class AppShellTests
         item.GlyphVisibility.Should().Be(System.Windows.Visibility.Visible);
     }
 
+    [Theory]
+    [InlineData(LauncherItemType.File, @"C:\Work\drawing.dwg", System.Windows.Visibility.Visible)]
+    [InlineData(LauncherItemType.Folder, @"C:\Work", System.Windows.Visibility.Visible)]
+    [InlineData(LauncherItemType.Command, @"C:\Work\setup.bat", System.Windows.Visibility.Visible)]
+    [InlineData(LauncherItemType.Command, "echo ready", System.Windows.Visibility.Collapsed)]
+    [InlineData(LauncherItemType.Action, "action:restart", System.Windows.Visibility.Collapsed)]
+    [InlineData(LauncherItemType.Action, "group:11111111-1111-1111-1111-111111111111", System.Windows.Visibility.Collapsed)]
+    [InlineData(LauncherItemType.Url, "https://example.com", System.Windows.Visibility.Collapsed)]
+    public void DockPanelItemViewModel_OpenLocationVisibility_ShouldMatchPhysicalTargets(
+        LauncherItemType type,
+        string target,
+        System.Windows.Visibility expected)
+    {
+        var item = new DockLauncher.AppHost.Docking.DockPanelItemViewModel(
+            Guid.NewGuid(), "Item", type, target, null, false, null);
+
+        item.OpenLocationVisibility.Should().Be(expected);
+    }
+
     [Fact]
     public async Task DockPanelItemViewModel_ContextCommands_ShouldInvokeAttachedCallbacks()
     {

@@ -266,7 +266,7 @@
                                     <MenuItem Command="{Binding EditCommand}" Header="Edit Item" />
                                     <MenuItem Command="{Binding OpenLocationCommand}"
                                               Header="Open Location"
-                                              Visibility="{Binding LauncherVisibility}" />
+                                              Visibility="{Binding OpenLocationVisibility}" />
                                     <MenuItem Command="{Binding RenameCommand}" Header="Rename" />
                                     <MenuItem Header="Move To Panel"
                                               ItemsSource="{Binding MoveTargets}"

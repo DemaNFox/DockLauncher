@@ -247,6 +247,33 @@ The drag handler persisted the docked window's current `ActualWidth` and `Actual
 - `src/AppHost/DockLauncher.AppHost/Docking/DockShellCoordinator.cs`
 - `src/Tests/DockLauncher.UiSmoke.Tests/AppShellTests.cs`
 
+## 2026-07-10: `Open Location` appeared for virtual items and could leave Windows busy
+
+### Symptoms
+
+- Panel groups and built-in actions displayed `Open Location` even though they have no filesystem location.
+- Opening locations for multiple files could intermittently fail, after which the Windows busy cursor could remain visible until DockLauncher exited.
+
+### Root cause
+
+- The menu visibility used the generic launcher visibility, which only excluded separators and did not distinguish filesystem items from `group:`, `profile:`, `action:`, URL, or command targets.
+- Location opening launched a synthetic folder item through the general shell-association service. Re-entering the Windows shell for an already running Explorer instance was unnecessary and could leave the WPF async command tied to unstable shell activation behavior.
+
+### Fix
+
+- Expose `Open Location` for filesystem-capable targets, including physical command scripts such as `.bat`, and reject virtual target prefixes.
+- Start `explorer.exe` directly without shell execution. Open folders normally and use `/select` for files, then immediately dispose the returned process handle and complete the UI command.
+- Treat missing, stale, or temporarily unavailable targets as a completed no-op.
+
+### Files
+
+- `src/AppHost/DockLauncher.AppHost/Docking/DockPanelWindowViewModel.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/GroupFlyoutWindowViewModel.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/DockPanelWindow.xaml`
+- `src/AppHost/DockLauncher.AppHost/Docking/GroupFlyoutWindow.xaml`
+- `src/AppHost/DockLauncher.AppHost/Docking/DockShellCoordinator.cs`
+- `src/Tests/DockLauncher.UiSmoke.Tests/AppShellTests.cs`
+
 ## Rule For New Issues
 
 When a new issue is resolved:

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
 using System.Windows;
@@ -1191,16 +1192,31 @@ public sealed class DockShellCoordinator : IDockShellController
             return Task.CompletedTask;
         }
 
-        var locationPath = Directory.Exists(target)
-            ? target
-            : Path.GetDirectoryName(target);
-
+        var isDirectory = Directory.Exists(target);
+        var locationPath = isDirectory ? target : Path.GetDirectoryName(target);
         if (string.IsNullOrWhiteSpace(locationPath) || !Directory.Exists(locationPath))
         {
             return Task.CompletedTask;
         }
 
-        return OpenFolderInExplorerAsync(locationPath);
+        try
+        {
+            var fullTarget = Path.GetFullPath(target);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = isDirectory
+                    ? $"\"{fullTarget}\""
+                    : $"/select,\"{fullTarget}\"",
+                UseShellExecute = false
+            })?.Dispose();
+        }
+        catch (Exception)
+        {
+            // A stale or temporarily unavailable path must not leave the UI command running.
+        }
+
+        return Task.CompletedTask;
     }
 
     private Task OpenItemLocationAsync(DockPanelItemViewModel item)

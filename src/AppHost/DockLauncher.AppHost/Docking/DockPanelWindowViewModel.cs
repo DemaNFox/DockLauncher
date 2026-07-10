@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows.Controls;
 using System.Windows;
 using System.Windows.Media;
@@ -813,6 +814,10 @@ public sealed partial class DockPanelItemViewModel : ObservableObject
 
     public Visibility LauncherVisibility => IsSeparator ? Visibility.Collapsed : Visibility.Visible;
 
+    public Visibility OpenLocationVisibility => SupportsOpenLocation(Type, Target)
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
     public Visibility IconVisibility => IconSource is null ? Visibility.Collapsed : Visibility.Visible;
 
     public Visibility GlyphVisibility => IconSource is null ? Visibility.Visible : Visibility.Collapsed;
@@ -852,6 +857,24 @@ public sealed partial class DockPanelItemViewModel : ObservableObject
     public IReadOnlyList<DockPanelMoveTargetViewModel> MoveTargets { get; }
 
     public Visibility MoveTargetsVisibility => MoveTargets.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    internal static bool SupportsOpenLocation(LauncherItemType type, string target)
+    {
+        if (type is LauncherItemType.Action or LauncherItemType.Url or LauncherItemType.Separator)
+        {
+            return false;
+        }
+
+        if (type == LauncherItemType.Command && !Path.IsPathFullyQualified(target))
+        {
+            return false;
+        }
+
+        return !string.IsNullOrWhiteSpace(target)
+            && !target.StartsWith("group:", StringComparison.OrdinalIgnoreCase)
+            && !target.StartsWith("profile:", StringComparison.OrdinalIgnoreCase)
+            && !target.StartsWith("action:", StringComparison.OrdinalIgnoreCase);
+    }
 
     public void AttachLauncher(Func<DockPanelItemViewModel, Task> launchAsync)
     {

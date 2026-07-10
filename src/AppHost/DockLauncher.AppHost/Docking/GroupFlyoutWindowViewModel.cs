@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DockLauncher.BuildingBlocks.Presentation.Wpf;
+using DockLauncher.Modules.Items.Domain;
 using DockLauncher.Modules.Panels.Domain;
 using System.Windows;
 using System.Windows.Media;
@@ -332,6 +333,12 @@ public sealed partial class GroupFlyoutItemViewModel : ObservableObject
     public IReadOnlyList<DockPanelMoveTargetViewModel> MoveTargets { get; }
 
     public Visibility MoveTargetsVisibility => MoveTargets.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility OpenLocationVisibility =>
+        Enum.TryParse<LauncherItemType>(KindLabel, out var type)
+        && DockPanelItemViewModel.SupportsOpenLocation(type, Target)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
     public Visibility IconVisibility => IconSource is null ? Visibility.Collapsed : Visibility.Visible;
 
