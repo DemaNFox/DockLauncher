@@ -274,6 +274,79 @@ The drag handler persisted the docked window's current `ActualWidth` and `Actual
 - `src/AppHost/DockLauncher.AppHost/Docking/DockShellCoordinator.cs`
 - `src/Tests/DockLauncher.UiSmoke.Tests/AppShellTests.cs`
 
+## 2026-08-27: Dropping items on runtime panels and group shortcuts did nothing or used the wrong target
+
+### Symptoms
+
+- Dropping a file on a group shortcut added it to the surrounding panel instead of the group.
+- Dropping a file on visually empty panel space near a group could incorrectly add it to that group.
+- Dragging a dock item from one runtime panel to another had no effect.
+- Dropping external files on a specific panel card in the configurator showed an allowed cursor but did nothing.
+- `Remove From Group` did not reliably remove the selected entry, and the group flyout closed while the command was being selected.
+
+### Root cause
+
+- Item-level drop handling always called the panel path handler and never inspected `group:<id>` targets.
+- After group routing was added, the entire outer item container was treated as the group drop target instead of only the actual launcher button.
+- The internal drag payload contained only the item ID. The receiving panel therefore treated a cross-panel drop as a same-panel reorder, which was rejected because the item did not belong to that panel.
+- The configurator panel-card handler advertised support for external paths but only processed internal item view models.
+- A WPF `ContextMenu` is hosted in a separate popup window. The global outside-click tracker therefore treated a click on `Remove From Group` as a click outside the flyout and could close it while the command was being executed.
+- A successful workspace update also rebuilt the runtime UI and closed every group flyout. Identical files in one or several groups are valid independent entries, so removal must remain scoped to the selected item ID.
+
+### Fix
+
+- Route drops on `group:<id>` launchers to group-specific persistence operations.
+- Use the original WPF hit target to route to a group only when the pointer is directly over that launcher's button; the rest of the item slot belongs to the panel.
+- Include the source panel ID in the runtime drag payload and distinguish same-panel reorder, cross-panel move, and move into group.
+- Process external path data in the configurator's panel-card drop handler.
+- Keep drops on ordinary launchers and built-in actions targeted at their surrounding panel.
+- Suppress outside-click dismissal while a group context menu is open and for a short grace period after it closes.
+- Remove only the selected item ID, update the flyout's observable collection immediately, and reopen the same group from the updated workspace after the runtime refresh.
+- Enumerate flyout windows through snapshots during refresh so close callbacks cannot invalidate the collection being traversed.
+
+### Files
+
+- `src/AppHost/DockLauncher.AppHost/Docking/DockPanelWindow.xaml.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/DockPanelWindowViewModel.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/DockShellCoordinator.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/GroupFlyoutWindow.xaml.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/GroupFlyoutWindowViewModel.cs`
+- `src/AppHost/DockLauncher.AppHost/MainWindow.xaml.cs`
+- `src/Tests/DockLauncher.UiSmoke.Tests/AppShellTests.cs`
+
+## 2026-08-27: Runtime panel drop gaps and edges did not provide a reliable insertion target
+
+### Symptoms
+
+- Files or dock items dropped between launchers, in the middle of the panel, or near its edge could fail to add or reorder.
+- External files were always appended, so the pointer position did not describe where the new launcher would appear.
+- There was no clear visual confirmation that the panel had accepted the drag or which insertion position would be used.
+- Cancelling a drag by moving the pointer outside the panel could leave the insertion line and separated icons visible.
+
+### Root cause
+
+- Drop behavior was divided between the window and individual item borders. A launcher's margin is outside the border's hit-test area, leaving the visible spacing without an item-level insertion target.
+- The external-path callback carried only the paths and discarded the insertion target ID.
+- The old highlight marked an entire item border and did not distinguish insertion before an item from insertion after it.
+- WPF reports `DragLeave` with the last in-panel pointer position, so the coordinate-based outside check could reject the cleanup even though the drag had already left the panel.
+
+### Fix
+
+- Handle supported drag-over and drop events once at `PanelShell` using preview routed events, so child controls, margins, empty panel space, and panel edges share one drop surface.
+- Resolve the nearest insertion boundary from the pointer and realized item bounds, excluding the internally dragged item.
+- Pass the resolved target item ID through the runtime view model and insert newly created launcher IDs before that target; a missing target means append.
+- Animate adjacent item containers apart and draw an accent insertion line at the same boundary used by persistence.
+- Keep direct drops on a group launcher button routed to the group instead of showing a panel insertion boundary.
+- Schedule insertion-visual cleanup shortly after `DragLeave` and cancel that cleanup on the next `DragOver`; moving between child controls remains smooth while a genuine panel exit always clears the visual state.
+
+### Files
+
+- `src/AppHost/DockLauncher.AppHost/Docking/DockPanelWindow.xaml`
+- `src/AppHost/DockLauncher.AppHost/Docking/DockPanelWindow.xaml.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/DockPanelWindowViewModel.cs`
+- `src/AppHost/DockLauncher.AppHost/Docking/DockShellCoordinator.cs`
+- `src/Tests/DockLauncher.UiSmoke.Tests/AppShellTests.cs`
+
 ## Rule For New Issues
 
 When a new issue is resolved:

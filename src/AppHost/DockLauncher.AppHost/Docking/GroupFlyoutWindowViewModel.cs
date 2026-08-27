@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using DockLauncher.BuildingBlocks.Presentation.Wpf;
 using DockLauncher.Modules.Items.Domain;
 using DockLauncher.Modules.Panels.Domain;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Media;
 
@@ -54,7 +55,7 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
         IconShape = iconShape;
         DisplayMode = displayMode;
         OpenMode = openMode;
-        Items = items;
+        Items = new ObservableCollection<GroupFlyoutItemViewModel>(items);
         var layout = CalculateLayout(items.Count, displayMode, openMode);
         WindowWidth = layout.WindowSize.Width;
         WindowHeight = layout.WindowSize.Height;
@@ -101,7 +102,7 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
 
     public double Top { get; }
 
-    public IReadOnlyList<GroupFlyoutItemViewModel> Items { get; }
+    public ObservableCollection<GroupFlyoutItemViewModel> Items { get; }
 
     public string ItemCountLabel => Items.Count == 1 ? "1 item" : $"{Items.Count} items";
 
@@ -282,7 +283,14 @@ public sealed partial class GroupFlyoutWindowViewModel : ViewModelBase
 
     private Task DuplicateToNewPanelAsync(GroupFlyoutItemViewModel item) => _duplicateToNewPanelAsync(item);
 
-    private Task RemoveAsync(GroupFlyoutItemViewModel item) => _removeAsync(item);
+    private async Task RemoveAsync(GroupFlyoutItemViewModel item)
+    {
+        await _removeAsync(item);
+        if (Items.Remove(item))
+        {
+            OnPropertyChanged(nameof(ItemCountLabel));
+        }
+    }
 
     private Task RenameAsync(GroupFlyoutItemViewModel item) => _renameAsync(item);
 

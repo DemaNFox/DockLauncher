@@ -16,6 +16,7 @@ namespace DockLauncher.AppHost.Docking;
 public partial class DockPanelWindow : Window
 {
     private const string DockPanelItemDragFormat = "DockLauncher.DockPanelItemId";
+    private const string DockPanelSourcePanelDragFormat = "DockLauncher.DockPanelSourcePanelId";
     private const double VisibleEdgeThickness = 10;
     private const double EdgeRevealDistance = 42;
     private const double ResizeBorderThickness = 8;
@@ -46,10 +47,15 @@ public partial class DockPanelWindow : Window
     private Guid? _draggedDockItemId;
     private FrameworkElement? _draggedDockElement;
     private Border? _dropTargetBorder;
+    private readonly HashSet<Border> _shiftedDropBorders = [];
+    private Guid? _dropInsertionTargetItemId;
+    private Guid? _dropInsertionDraggedItemId;
+    private bool _hasInsertionVisual;
     private bool _hasOpenContextMenu;
     private double _overflowScrollOffset;
     private HwndSource? _hwndSource;
     private readonly DispatcherTimer _persistSizeTimer;
+    private readonly DispatcherTimer _dropLeaveTimer;
     private bool _applyingWindowMetrics;
 
     public DockPanelWindow(DockPanelWindowViewModel viewModel)
@@ -64,8 +70,9 @@ public partial class DockPanelWindow : Window
         MouseLeave += OnMouseLeave;
         MouseMove += OnMouseMove;
         PanelShell.PreviewMouseLeftButtonDown += OnPanelChromePreviewMouseLeftButtonDown;
-        Drop += OnDrop;
-        DragOver += OnDragOver;
+        PanelShell.PreviewDragOver += OnPanelPreviewDragOver;
+        PanelShell.PreviewDragLeave += OnPanelPreviewDragLeave;
+        PanelShell.PreviewDrop += OnPanelPreviewDrop;
         AddHandler(ContextMenuOpeningEvent, new ContextMenuEventHandler(OnAnyContextMenuOpening), handledEventsToo: true);
         AddHandler(ContextMenuClosingEvent, new ContextMenuEventHandler(OnAnyContextMenuClosing), handledEventsToo: true);
         StateChanged += OnStateChanged;
@@ -74,10 +81,13 @@ public partial class DockPanelWindow : Window
         _autoHideTimer.Tick += OnAutoHideTimerTick;
         _persistSizeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
         _persistSizeTimer.Tick += OnPersistSizeTimerTick;
+        _dropLeaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(55) };
+        _dropLeaveTimer.Tick += OnDropLeaveTimerTick;
         Closed += (_, _) =>
         {
             _autoHideTimer.Stop();
             _persistSizeTimer.Stop();
+            _dropLeaveTimer.Stop();
             if (_hwndSource is not null)
             {
                 _hwndSource.RemoveHook(WndProc);
@@ -550,32 +560,106 @@ public partial class DockPanelWindow : Window
             || point.Y >= PanelShell.ActualHeight - bottomEdge;
     }
 
-    private void OnDragOver(object sender, DragEventArgs e)
+    private void OnPanelPreviewDragOver(object sender, DragEventArgs e)
     {
-        e.Effects = DroppedPathExtractor.HasPaths(e.Data)
-            ? DragDropEffects.Copy
-            : e.Data.GetDataPresent(DockPanelItemDragFormat)
-                ? DragDropEffects.Move
-                : DragDropEffects.None;
-        e.Handled = true;
-    }
-
-    private async void OnDrop(object sender, DragEventArgs e)
-    {
-        var droppedPaths = DroppedPathExtractor.ExtractPaths(e.Data);
-        if (droppedPaths.Count > 0 && DataContext is DockPanelWindowViewModel viewModel)
+        _dropLeaveTimer.Stop();
+        if (DataContext is not DockPanelWindowViewModel viewModel)
         {
-            e.Handled = true;
-            await viewModel.AddDroppedPathsAsync(droppedPaths);
             return;
         }
 
-        if (TryGetDraggedDockItemId(e, out var draggedItemId)
-            && DataContext is DockPanelWindowViewModel dockViewModel)
+        var hasPaths = DroppedPathExtractor.HasPaths(e.Data);
+        var hasDockItem = TryGetDraggedDockItemId(e, out var draggedItemId);
+        if (!hasPaths && !hasDockItem)
+        {
+            ClearDropTargetVisual();
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        var hoveredItem = FindDockItemFromOriginalSource(e.OriginalSource as DependencyObject);
+        var isDirectGroupHit = hoveredItem is not null
+            && hoveredItem.TryGetGroupId(out _)
+            && IsDirectLauncherButtonHit(e, hoveredItem);
+        if (isDirectGroupHit)
+        {
+            UpdateGroupDropTargetVisual(FindItemBorder(hoveredItem!.Id));
+        }
+        else
+        {
+            var insertionTargetItemId = ResolvePanelInsertionTargetItemId(
+                viewModel,
+                e.GetPosition(OverflowViewport),
+                hasDockItem ? draggedItemId : null);
+            UpdateInsertionTargetVisual(viewModel, insertionTargetItemId, hasDockItem ? draggedItemId : null);
+        }
+
+        e.Effects = hasPaths ? DragDropEffects.Copy : DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void OnPanelPreviewDragLeave(object sender, DragEventArgs e)
+    {
+        _dropLeaveTimer.Stop();
+        _dropLeaveTimer.Start();
+    }
+
+    private void OnDropLeaveTimerTick(object? sender, EventArgs e)
+    {
+        _dropLeaveTimer.Stop();
+        ClearDropTargetVisual();
+    }
+
+    private async void OnPanelPreviewDrop(object sender, DragEventArgs e)
+    {
+        _dropLeaveTimer.Stop();
+        if (DataContext is not DockPanelWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        var hoveredItem = FindDockItemFromOriginalSource(e.OriginalSource as DependencyObject);
+        var isDirectGroupHit = hoveredItem is not null
+            && hoveredItem.TryGetGroupId(out _)
+            && IsDirectLauncherButtonHit(e, hoveredItem);
+        var droppedPaths = DroppedPathExtractor.ExtractPaths(e.Data);
+        if (droppedPaths.Count > 0)
         {
             e.Handled = true;
-            await dockViewModel.MoveItemWithinPanelAsync(draggedItemId, targetItemId: null);
+            var insertionTargetItemId = isDirectGroupHit
+                ? hoveredItem!.Id
+                : ResolvePanelInsertionTargetItemId(viewModel, e.GetPosition(OverflowViewport), draggedItemId: null);
+            ClearDropTargetVisual();
+            if (isDirectGroupHit)
+            {
+                await viewModel.AddDroppedPathsAsync(droppedPaths, hoveredItem!, isDirectLauncherHit: true);
+            }
+            else
+            {
+                await viewModel.AddDroppedPathsAtAsync(droppedPaths, insertionTargetItemId);
+            }
+
+            return;
         }
+
+        if (!TryGetDraggedDockItemId(e, out var draggedItemId))
+        {
+            ClearDropTargetVisual();
+            return;
+        }
+
+        e.Handled = true;
+        var sourcePanelId = GetDraggedSourcePanelId(e, viewModel.PanelId);
+        var targetItemId = isDirectGroupHit
+            ? hoveredItem!.Id
+            : ResolvePanelInsertionTargetItemId(viewModel, e.GetPosition(OverflowViewport), draggedItemId);
+        ClearDropTargetVisual();
+        await viewModel.DropDockItemAsync(
+            sourcePanelId,
+            draggedItemId,
+            isDirectGroupHit ? hoveredItem : FindItem(viewModel.Items, targetItemId),
+            isDirectGroupHit);
     }
 
     private void OnDockItemPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -609,6 +693,10 @@ public partial class DockPanelWindow : Window
 
         var dataObject = new DataObject();
         dataObject.SetData(DockPanelItemDragFormat, _draggedDockItemId.Value.ToString("D"));
+        if (DataContext is DockPanelWindowViewModel viewModel)
+        {
+            dataObject.SetData(DockPanelSourcePanelDragFormat, viewModel.PanelId.ToString("D"));
+        }
         _draggedDockElement = element;
         element.Opacity = 0.46;
 
@@ -626,84 +714,32 @@ public partial class DockPanelWindow : Window
         }
     }
 
-    private void OnDockItemDragOver(object sender, DragEventArgs e)
+    private Guid? ResolvePanelInsertionTargetItemId(
+        DockPanelWindowViewModel viewModel,
+        Point pointer,
+        Guid? draggedItemId)
     {
-        if (DroppedPathExtractor.HasPaths(e.Data))
+        var candidates = GetItemBorderBounds()
+            .Where(candidate => candidate.Item.Id != draggedItemId)
+            .ToArray();
+        if (candidates.Length == 0)
         {
-            ClearDropTargetVisual();
-            e.Effects = DragDropEffects.Copy;
-            e.Handled = true;
-            return;
+            return null;
         }
 
-        if (TryGetDraggedDockItemId(e, out var draggedItemId)
-            && sender is FrameworkElement { DataContext: DockPanelItemViewModel targetItem }
-            && draggedItemId != targetItem.Id)
+        var closest = candidates
+            .OrderBy(candidate => DistanceSquared(pointer, candidate.Bounds))
+            .First();
+        var insertAfterClosest = viewModel.ItemsOrientation == Orientation.Horizontal
+            ? pointer.X >= closest.Bounds.Left + closest.Bounds.Width / 2
+            : pointer.Y >= closest.Bounds.Top + closest.Bounds.Height / 2;
+        if (!insertAfterClosest)
         {
-            e.Effects = DragDropEffects.Move;
-            UpdateDropTargetVisual(sender as Border);
-            e.Handled = true;
-            return;
+            return closest.Item.Id;
         }
 
-        ClearDropTargetVisual();
-        e.Effects = DragDropEffects.None;
-        e.Handled = true;
-    }
-
-    private async void OnDockItemDrop(object sender, DragEventArgs e)
-    {
-        var droppedPaths = DroppedPathExtractor.ExtractPaths(e.Data);
-        if (droppedPaths.Count > 0 && DataContext is DockPanelWindowViewModel dockViewModel)
-        {
-            e.Handled = true;
-            ClearDropTargetVisual();
-            await dockViewModel.AddDroppedPathsAsync(droppedPaths);
-            return;
-        }
-
-        if (!TryGetDraggedDockItemId(e, out var draggedItemId)
-            || sender is not FrameworkElement { DataContext: DockPanelItemViewModel targetItem }
-            || DataContext is not DockPanelWindowViewModel viewModel)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        var insertionTargetItemId = ResolveInsertionTargetItemId(draggedItemId, targetItem, sender, e, viewModel);
-        ClearDropTargetVisual();
-        await viewModel.MoveItemWithinPanelAsync(draggedItemId, insertionTargetItemId);
-    }
-
-    private static Guid? ResolveInsertionTargetItemId(
-        Guid draggedItemId,
-        DockPanelItemViewModel targetItem,
-        object dropSender,
-        DragEventArgs e,
-        DockPanelWindowViewModel viewModel)
-    {
-        if (dropSender is not FrameworkElement targetElement)
-        {
-            return targetItem.Id;
-        }
-
-        var pointer = e.GetPosition(targetElement);
-        var insertAfterTarget = viewModel.ItemsOrientation == Orientation.Horizontal
-            ? pointer.X >= targetElement.ActualWidth / 2
-            : pointer.Y >= targetElement.ActualHeight / 2;
-
-        if (!insertAfterTarget)
-        {
-            return targetItem.Id;
-        }
-
-        var targetIndex = IndexOfItem(viewModel.Items, targetItem.Id);
-        if (targetIndex < 0)
-        {
-            return targetItem.Id;
-        }
-
-        for (var index = targetIndex + 1; index < viewModel.Items.Count; index++)
+        var closestIndex = IndexOfItem(viewModel.Items, closest.Item.Id);
+        for (var index = closestIndex + 1; index < viewModel.Items.Count; index++)
         {
             var nextItemId = viewModel.Items[index].Id;
             if (nextItemId != draggedItemId)
@@ -714,6 +750,94 @@ public partial class DockPanelWindow : Window
 
         return null;
     }
+
+    private static double DistanceSquared(Point pointer, Rect bounds)
+    {
+        var closestX = Math.Clamp(pointer.X, bounds.Left, bounds.Right);
+        var closestY = Math.Clamp(pointer.Y, bounds.Top, bounds.Bottom);
+        var deltaX = pointer.X - closestX;
+        var deltaY = pointer.Y - closestY;
+        return deltaX * deltaX + deltaY * deltaY;
+    }
+
+    private DockPanelItemViewModel? FindDockItemFromOriginalSource(DependencyObject? source)
+    {
+        var current = source;
+        while (current is not null && current != PanelShell)
+        {
+            if (current is FrameworkElement { DataContext: DockPanelItemViewModel item })
+            {
+                return item;
+            }
+
+            current = GetParent(current);
+        }
+
+        return null;
+    }
+
+    private Border? FindItemBorder(Guid itemId)
+    {
+        return GetItemBorders().FirstOrDefault(border =>
+            border.DataContext is DockPanelItemViewModel item && item.Id == itemId);
+    }
+
+    private IReadOnlyList<ItemBorderBounds> GetItemBorderBounds()
+    {
+        var result = new List<ItemBorderBounds>();
+        foreach (var border in GetItemBorders())
+        {
+            if (border.DataContext is not DockPanelItemViewModel item || border.ActualWidth <= 0 || border.ActualHeight <= 0)
+            {
+                continue;
+            }
+
+            try
+            {
+                var bounds = border.TransformToAncestor(OverflowViewport)
+                    .TransformBounds(new Rect(0, 0, border.ActualWidth, border.ActualHeight));
+                result.Add(new ItemBorderBounds(item, border, bounds));
+            }
+            catch (InvalidOperationException)
+            {
+                // A runtime refresh can detach an item between drag events.
+            }
+        }
+
+        return result;
+    }
+
+    private IEnumerable<Border> GetItemBorders()
+    {
+        return EnumerateVisualDescendants(OverflowItemsHost)
+            .OfType<Border>()
+            .Where(border => string.Equals(border.Name, "DockItemContainer", StringComparison.Ordinal));
+    }
+
+    private static IEnumerable<DependencyObject> EnumerateVisualDescendants(DependencyObject root)
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            yield return child;
+            foreach (var descendant in EnumerateVisualDescendants(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static DependencyObject? GetParent(DependencyObject current)
+    {
+        return current is Visual or System.Windows.Media.Media3D.Visual3D
+            ? VisualTreeHelper.GetParent(current)
+            : LogicalTreeHelper.GetParent(current);
+    }
+
+    private readonly record struct ItemBorderBounds(
+        DockPanelItemViewModel Item,
+        Border Border,
+        Rect Bounds);
 
     private static int IndexOfItem(IReadOnlyList<DockPanelItemViewModel> items, Guid itemId)
     {
@@ -728,9 +852,32 @@ public partial class DockPanelWindow : Window
         return -1;
     }
 
-    private void UpdateDropTargetVisual(Border? border)
+    private static DockPanelItemViewModel? FindItem(IReadOnlyList<DockPanelItemViewModel> items, Guid? itemId)
     {
-        if (_dropTargetBorder == border)
+        return itemId is null ? null : items.FirstOrDefault(item => item.Id == itemId.Value);
+    }
+
+    private static bool IsDirectLauncherButtonHit(DragEventArgs e, DockPanelItemViewModel targetItem)
+    {
+        var current = e.OriginalSource as DependencyObject;
+        while (current is not null)
+        {
+            if (current is Button { DataContext: DockPanelItemViewModel buttonItem })
+            {
+                return buttonItem.Id == targetItem.Id;
+            }
+
+            current = current is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return false;
+    }
+
+    private void UpdateGroupDropTargetVisual(Border? border)
+    {
+        if (_dropTargetBorder == border && !_hasInsertionVisual)
         {
             return;
         }
@@ -744,16 +891,159 @@ public partial class DockPanelWindow : Window
         }
     }
 
-    private void ClearDropTargetVisual()
+    private void UpdateInsertionTargetVisual(
+        DockPanelWindowViewModel viewModel,
+        Guid? targetItemId,
+        Guid? draggedItemId)
     {
-        if (_dropTargetBorder is null)
+        if (_hasInsertionVisual
+            && _dropTargetBorder is null
+            && _dropInsertionTargetItemId == targetItemId
+            && _dropInsertionDraggedItemId == draggedItemId)
         {
             return;
         }
 
-        _dropTargetBorder.BorderBrush = Brushes.Transparent;
-        _dropTargetBorder.BorderThickness = new Thickness(0);
-        _dropTargetBorder = null;
+        ClearDropTargetVisual();
+        _hasInsertionVisual = true;
+        _dropInsertionTargetItemId = targetItemId;
+        _dropInsertionDraggedItemId = draggedItemId;
+
+        var boundsById = GetItemBorderBounds().ToDictionary(candidate => candidate.Item.Id);
+        var orderedCandidates = viewModel.Items
+            .Where(item => item.Id != draggedItemId && boundsById.ContainsKey(item.Id))
+            .Select(item => boundsById[item.Id])
+            .ToArray();
+        if (orderedCandidates.Length == 0)
+        {
+            ShowEmptyPanelInsertionIndicator(viewModel.ItemsOrientation);
+            return;
+        }
+
+        ItemBorderBounds leadingItem;
+        ItemBorderBounds? trailingItem = null;
+        double boundary;
+        if (targetItemId is not null
+            && boundsById.TryGetValue(targetItemId.Value, out var targetBounds)
+            && targetBounds.Item.Id != draggedItemId)
+        {
+            leadingItem = targetBounds;
+            var targetIndex = Array.FindIndex(orderedCandidates, candidate => candidate.Item.Id == targetItemId.Value);
+            if (targetIndex > 0)
+            {
+                trailingItem = orderedCandidates[targetIndex - 1];
+            }
+
+            boundary = viewModel.ItemsOrientation == Orientation.Horizontal
+                ? leadingItem.Bounds.Left
+                : leadingItem.Bounds.Top;
+            AnimateDropShift(
+                leadingItem.Border,
+                viewModel.ItemsOrientation == Orientation.Horizontal ? InsertionGapShift : 0,
+                viewModel.ItemsOrientation == Orientation.Vertical ? InsertionGapShift : 0);
+        }
+        else
+        {
+            trailingItem = orderedCandidates[^1];
+            leadingItem = trailingItem.Value;
+            boundary = viewModel.ItemsOrientation == Orientation.Horizontal
+                ? leadingItem.Bounds.Right
+                : leadingItem.Bounds.Bottom;
+        }
+
+        if (trailingItem is { } previous && IsSameVisualTrack(previous.Bounds, leadingItem.Bounds, viewModel.ItemsOrientation))
+        {
+            AnimateDropShift(
+                previous.Border,
+                viewModel.ItemsOrientation == Orientation.Horizontal ? -InsertionGapShift : 0,
+                viewModel.ItemsOrientation == Orientation.Vertical ? -InsertionGapShift : 0);
+        }
+
+        ShowInsertionIndicator(leadingItem.Bounds, boundary, viewModel.ItemsOrientation);
+    }
+
+    private const double InsertionGapShift = 8d;
+
+    private static bool IsSameVisualTrack(Rect first, Rect second, Orientation orientation)
+    {
+        return orientation == Orientation.Horizontal
+            ? first.Bottom > second.Top && second.Bottom > first.Top
+            : first.Right > second.Left && second.Right > first.Left;
+    }
+
+    private void ShowEmptyPanelInsertionIndicator(Orientation orientation)
+    {
+        var bounds = new Rect(0, 0, Math.Max(1, OverflowViewport.ActualWidth), Math.Max(1, OverflowViewport.ActualHeight));
+        var boundary = orientation == Orientation.Horizontal ? bounds.Width / 2 : bounds.Height / 2;
+        ShowInsertionIndicator(bounds, boundary, orientation);
+    }
+
+    private void ShowInsertionIndicator(Rect itemBounds, double boundary, Orientation orientation)
+    {
+        if (orientation == Orientation.Horizontal)
+        {
+            var height = Math.Max(24, Math.Min(itemBounds.Height * 0.72, OverflowViewport.ActualHeight - 8));
+            DropInsertionIndicator.Width = 4;
+            DropInsertionIndicator.Height = height;
+            Canvas.SetLeft(DropInsertionIndicator, Math.Clamp(boundary - 2, 2, Math.Max(2, OverflowViewport.ActualWidth - 6)));
+            Canvas.SetTop(DropInsertionIndicator, Math.Max(4, itemBounds.Top + (itemBounds.Height - height) / 2));
+        }
+        else
+        {
+            var width = Math.Max(24, Math.Min(itemBounds.Width * 0.72, OverflowViewport.ActualWidth - 8));
+            DropInsertionIndicator.Width = width;
+            DropInsertionIndicator.Height = 4;
+            Canvas.SetLeft(DropInsertionIndicator, Math.Max(4, itemBounds.Left + (itemBounds.Width - width) / 2));
+            Canvas.SetTop(DropInsertionIndicator, Math.Clamp(boundary - 2, 2, Math.Max(2, OverflowViewport.ActualHeight - 6)));
+        }
+
+        DropInsertionIndicator.Opacity = 1;
+        DropInsertionIndicator.Visibility = Visibility.Visible;
+    }
+
+    private void AnimateDropShift(Border border, double x, double y)
+    {
+        if (border.RenderTransform is not TranslateTransform transform)
+        {
+            transform = new TranslateTransform();
+            border.RenderTransform = transform;
+        }
+
+        var animationDuration = TimeSpan.FromMilliseconds(110);
+        var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        transform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(x, animationDuration) { EasingFunction = easing });
+        transform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(y, animationDuration) { EasingFunction = easing });
+        _shiftedDropBorders.Add(border);
+    }
+
+    private void ClearDropTargetVisual()
+    {
+        _dropLeaveTimer.Stop();
+        if (_dropTargetBorder is not null)
+        {
+            _dropTargetBorder.BorderBrush = Brushes.Transparent;
+            _dropTargetBorder.BorderThickness = new Thickness(1.5);
+            _dropTargetBorder = null;
+        }
+
+        foreach (var border in _shiftedDropBorders)
+        {
+            if (border.RenderTransform is not TranslateTransform transform)
+            {
+                continue;
+            }
+
+            var animationDuration = TimeSpan.FromMilliseconds(90);
+            var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+            transform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0, animationDuration) { EasingFunction = easing });
+            transform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, animationDuration) { EasingFunction = easing });
+        }
+
+        _shiftedDropBorders.Clear();
+        DropInsertionIndicator.Visibility = Visibility.Collapsed;
+        _hasInsertionVisual = false;
+        _dropInsertionTargetItemId = null;
+        _dropInsertionDraggedItemId = null;
     }
 
     private static bool TryGetDraggedDockItemId(DragEventArgs e, out Guid itemId)
@@ -767,6 +1057,15 @@ public partial class DockPanelWindow : Window
 
         itemId = Guid.Empty;
         return false;
+    }
+
+    private static Guid GetDraggedSourcePanelId(DragEventArgs e, Guid fallbackPanelId)
+    {
+        return e.Data.GetDataPresent(DockPanelSourcePanelDragFormat)
+            && e.Data.GetData(DockPanelSourcePanelDragFormat) is string rawPanelId
+            && Guid.TryParse(rawPanelId, out var panelId)
+                ? panelId
+                : fallbackPanelId;
     }
 
     private PanelPosition CalculateNearestPosition()

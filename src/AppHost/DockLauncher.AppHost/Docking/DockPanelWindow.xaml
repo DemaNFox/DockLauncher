@@ -222,15 +222,18 @@
                     Opacity="0" />
 
             <Grid x:Name="OverflowViewport"
+                  Background="Transparent"
                   ClipToBounds="True"
                   PreviewMouseWheel="OnOverflowViewportMouseWheel">
                 <ScrollViewer x:Name="OverflowScrollViewer"
+                              Background="Transparent"
                               Margin="{Binding OverflowScrollViewerMargin}"
                               HorizontalScrollBarVisibility="Hidden"
                               VerticalScrollBarVisibility="Hidden"
                               CanContentScroll="False"
                               PanningMode="Both">
                     <ItemsControl x:Name="OverflowItemsHost"
+                                  Background="Transparent"
                                   HorizontalAlignment="{Binding OverflowItemsHorizontalAlignment}"
                                   VerticalAlignment="{Binding OverflowItemsVerticalAlignment}"
                                   ItemsSource="{Binding Items}">
@@ -245,15 +248,14 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border AllowDrop="True"
+                                <Border x:Name="DockItemContainer"
+                                        AllowDrop="True"
                                         Background="Transparent"
                                         BorderBrush="Transparent"
                                         BorderThickness="1.5"
                                         Margin="{Binding DataContext.DockItemMargin, RelativeSource={RelativeSource AncestorType=Window}}"
                                         PreviewMouseLeftButtonDown="OnDockItemPreviewMouseLeftButtonDown"
-                                        PreviewMouseMove="OnDockItemMouseMove"
-                                        DragOver="OnDockItemDragOver"
-                                        Drop="OnDockItemDrop">
+                                        PreviewMouseMove="OnDockItemMouseMove">
                             <Border.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem Command="{Binding LaunchCommand}"
@@ -405,6 +407,23 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
+                <Canvas x:Name="DropIndicatorLayer"
+                        Panel.ZIndex="4"
+                        IsHitTestVisible="False">
+                    <Border x:Name="DropInsertionIndicator"
+                            Width="4"
+                            Height="36"
+                            Visibility="Collapsed"
+                            Background="#FF38BDF8"
+                            CornerRadius="2">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="9"
+                                              ShadowDepth="0"
+                                              Opacity="0.9"
+                                              Color="#FF38BDF8" />
+                        </Border.Effect>
+                    </Border>
+                </Canvas>
                 <TextBlock x:Name="OverflowStartIndicator"
                            HorizontalAlignment="Left"
                            VerticalAlignment="Center"

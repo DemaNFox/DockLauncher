@@ -74,6 +74,13 @@ Flyout lists show item names only; long names are truncated with an ellipsis ins
 
 Groups and launch profiles are no longer supposed to depend on the old `SelectedPanelItem` workflow.
 
+Runtime drag and drop follows the visual target:
+
+- dropping files on empty panel space or on an ordinary/action launcher adds them to that panel
+- dropping files or a panel item directly on the button of a `group:<id>` launcher adds or moves them into that group; its surrounding slot remains panel space
+- dragging an item to another runtime panel moves it to that panel; dragging inside one panel reorders it
+- while a supported item is dragged over panel space, neighboring launchers separate and an accent insertion line shows the exact persisted position; this also works in item margins and at panel edges
+
 ### Groups
 
 - choose a source panel inside the `Groups` tab

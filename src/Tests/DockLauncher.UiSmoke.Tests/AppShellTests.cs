@@ -683,6 +683,145 @@ public class AppShellTests
     }
 
     [Fact]
+    public async Task DockPanelWindowViewModel_DropOnGroupShortcut_ShouldRoutePathsAndPanelItemsToGroup()
+    {
+        var groupId = Guid.NewGuid();
+        var sourcePanelId = Guid.NewGuid();
+        var draggedItemId = Guid.NewGuid();
+        Guid? capturedPathGroupId = null;
+        Guid? capturedItemGroupId = null;
+        Guid? capturedSourcePanelId = null;
+        IReadOnlyList<string>? capturedPaths = null;
+        var panelDropCount = 0;
+        var groupShortcut = new DockPanelItemViewModel(
+            Guid.NewGuid(),
+            "Tools",
+            LauncherItemType.Action,
+            $"group:{groupId:D}",
+            null,
+            false,
+            null);
+        var viewModel = CreateDockPanelWindowViewModelForOverflow(
+            [groupShortcut],
+            activeTracks: 1,
+            visibleSlots: 1,
+            overflowActive: false,
+            addDroppedPathsAsync: _ =>
+            {
+                panelDropCount++;
+                return Task.CompletedTask;
+            },
+            addDroppedPathsToGroupAsync: (targetGroupId, paths) =>
+            {
+                capturedPathGroupId = targetGroupId;
+                capturedPaths = paths;
+                return Task.CompletedTask;
+            },
+            moveDockItemToGroupAsync: (panelId, itemId, targetGroupId) =>
+            {
+                capturedSourcePanelId = panelId;
+                capturedItemGroupId = targetGroupId;
+                itemId.Should().Be(draggedItemId);
+                return Task.CompletedTask;
+            });
+
+        await viewModel.AddDroppedPathsAsync([@"C:\Temp\Tool.exe"], groupShortcut, isDirectLauncherHit: true);
+        await viewModel.AddDroppedPathsAsync([@"C:\Temp\PanelTool.exe"], groupShortcut, isDirectLauncherHit: false);
+        await viewModel.DropDockItemAsync(sourcePanelId, draggedItemId, groupShortcut, isDirectLauncherHit: true);
+
+        capturedPathGroupId.Should().Be(groupId);
+        capturedPaths.Should().Equal(@"C:\Temp\Tool.exe");
+        panelDropCount.Should().Be(1);
+        capturedSourcePanelId.Should().Be(sourcePanelId);
+        capturedItemGroupId.Should().Be(groupId);
+    }
+
+    [Fact]
+    public async Task DockPanelWindowViewModel_DropOnPanel_ShouldPreserveSourcePanelAndInsertionTarget()
+    {
+        var sourcePanelId = Guid.NewGuid();
+        var draggedItemId = Guid.NewGuid();
+        var targetItem = new DockPanelItemViewModel(
+            Guid.NewGuid(),
+            "Lock Screen",
+            LauncherItemType.Action,
+            "action:lock",
+            null,
+            false,
+            null);
+        Guid? capturedSourcePanelId = null;
+        Guid? capturedItemId = null;
+        Guid? capturedTargetItemId = null;
+        IReadOnlyList<string>? capturedPanelPaths = null;
+        var viewModel = CreateDockPanelWindowViewModelForOverflow(
+            [targetItem],
+            activeTracks: 1,
+            visibleSlots: 1,
+            overflowActive: false,
+            addDroppedPathsAsync: paths =>
+            {
+                capturedPanelPaths = paths;
+                return Task.CompletedTask;
+            },
+            moveDockItemAsync: (panelId, itemId, targetId) =>
+            {
+                capturedSourcePanelId = panelId;
+                capturedItemId = itemId;
+                capturedTargetItemId = targetId;
+                return Task.CompletedTask;
+            });
+
+        await viewModel.AddDroppedPathsAsync([@"C:\Temp\Tool.exe"], targetItem, isDirectLauncherHit: true);
+        await viewModel.DropDockItemAsync(sourcePanelId, draggedItemId, targetItem, isDirectLauncherHit: true);
+
+        capturedPanelPaths.Should().Equal(@"C:\Temp\Tool.exe");
+        capturedSourcePanelId.Should().Be(sourcePanelId);
+        capturedItemId.Should().Be(draggedItemId);
+        capturedTargetItemId.Should().Be(targetItem.Id);
+    }
+
+    [Fact]
+    public async Task DockPanelWindowViewModel_ExternalDrop_ShouldPreserveInsertionTarget()
+    {
+        var targetItemId = Guid.NewGuid();
+        Guid? capturedTargetItemId = null;
+        IReadOnlyList<string>? capturedPaths = null;
+        var viewModel = CreateDockPanelWindowViewModelForOverflow(
+            [],
+            activeTracks: 1,
+            visibleSlots: 1,
+            overflowActive: false,
+            addDroppedPathsAtAsync: (paths, targetId) =>
+            {
+                capturedPaths = paths;
+                capturedTargetItemId = targetId;
+                return Task.CompletedTask;
+            });
+
+        await viewModel.AddDroppedPathsAtAsync([@"C:\Temp\Inserted.exe"], targetItemId);
+
+        capturedPaths.Should().Equal(@"C:\Temp\Inserted.exe");
+        capturedTargetItemId.Should().Be(targetItemId);
+    }
+
+    [Fact]
+    public void DockShellCoordinator_ExternalDrop_ShouldInsertItemsBeforeVisualTarget()
+    {
+        var firstItemId = Guid.NewGuid();
+        var targetItemId = Guid.NewGuid();
+        var lastItemId = Guid.NewGuid();
+        var firstDroppedId = Guid.NewGuid();
+        var secondDroppedId = Guid.NewGuid();
+
+        var result = DockShellCoordinator.InsertItemsBefore(
+            [firstItemId, targetItemId, lastItemId],
+            [firstDroppedId, secondDroppedId],
+            targetItemId);
+
+        result.Should().Equal(firstItemId, firstDroppedId, secondDroppedId, targetItemId, lastItemId);
+    }
+
+    [Fact]
     public async Task DockPanelWindowViewModel_PanelCommands_ShouldInvokeAttachedCallbacks()
     {
         var item = new DockLauncher.AppHost.Docking.DockPanelItemViewModel(Guid.NewGuid(), "Editor", LauncherItemType.Application, "notepad.exe", null, false, null);
@@ -860,6 +999,41 @@ public class AppShellTests
         item.Glyph.Should().Be("APP");
         item.IconVisibility.Should().Be(System.Windows.Visibility.Collapsed);
         item.GlyphVisibility.Should().Be(System.Windows.Visibility.Visible);
+    }
+
+    [Fact]
+    public async Task GroupFlyoutWindowViewModel_RemoveCommand_ShouldRemoveItemFromVisibleCollection()
+    {
+        var removed = false;
+        var item = new GroupFlyoutItemViewModel(Guid.NewGuid(), "Editor", "notepad.exe", null, "Application");
+        var viewModel = new GroupFlyoutWindowViewModel(
+            "Tools",
+            groupIconSource: null,
+            left: 0,
+            top: 0,
+            PanelIconShape.Circle,
+            PanelFlyoutDisplayMode.Tiles,
+            PanelGroupOpenMode.Floating,
+            [item],
+            launchAsync: _ => Task.CompletedTask,
+            launchAsAdministratorAsync: _ => Task.CompletedTask,
+            openLocationAsync: _ => Task.CompletedTask,
+            duplicateAsync: _ => Task.CompletedTask,
+            duplicateToNewPanelAsync: _ => Task.CompletedTask,
+            removeAsync: _ =>
+            {
+                removed = true;
+                return Task.CompletedTask;
+            },
+            renameAsync: _ => Task.CompletedTask,
+            editAsync: _ => Task.CompletedTask,
+            moveToPanelAsync: (_, _) => Task.CompletedTask);
+
+        await item.RemoveCommand.ExecuteAsync(null);
+
+        removed.Should().BeTrue();
+        viewModel.Items.Should().BeEmpty();
+        viewModel.ItemCountLabel.Should().Be("0 items");
     }
 
     [Fact]
@@ -1165,7 +1339,12 @@ public class AppShellTests
         IReadOnlyList<DockLauncher.AppHost.Docking.DockPanelItemViewModel> items,
         int activeTracks,
         int visibleSlots,
-        bool overflowActive)
+        bool overflowActive,
+        Func<IReadOnlyList<string>, Task>? addDroppedPathsAsync = null,
+        Func<Guid, IReadOnlyList<string>, Task>? addDroppedPathsToGroupAsync = null,
+        Func<Guid, Guid, Guid?, Task>? moveDockItemAsync = null,
+        Func<Guid, Guid, Guid, Task>? moveDockItemToGroupAsync = null,
+        Func<IReadOnlyList<string>, Guid?, Task>? addDroppedPathsAtAsync = null)
     {
         return new DockLauncher.AppHost.Docking.DockPanelWindowViewModel(
             panelId: Guid.NewGuid(),
@@ -1204,7 +1383,7 @@ public class AppShellTests
             activateItemAsync: _ => Task.CompletedTask,
             showConfigurator: () => { },
             refreshPanelsAsync: () => Task.CompletedTask,
-            addDroppedPathsAsync: _ => Task.CompletedTask,
+            addDroppedPathsAsync: addDroppedPathsAsync ?? (_ => Task.CompletedTask),
             addFileAsync: () => Task.CompletedTask,
             addFolderAsync: () => Task.CompletedTask,
             addSeparatorAsync: () => Task.CompletedTask,
@@ -1233,7 +1412,11 @@ public class AppShellTests
             moveToPanelAsync: (_, _) => Task.CompletedTask,
             moveWithinPanelAsync: (_, _) => Task.CompletedTask,
             hasOpenFlyouts: () => false,
-            exit: () => { });
+            exit: () => { },
+            addDroppedPathsToGroupAsync: addDroppedPathsToGroupAsync,
+            moveDockItemAsync: moveDockItemAsync,
+            moveDockItemToGroupAsync: moveDockItemToGroupAsync,
+            addDroppedPathsAtAsync: addDroppedPathsAtAsync);
     }
 
     private static WorkspaceEditorViewModel CreateWorkspaceEditor(

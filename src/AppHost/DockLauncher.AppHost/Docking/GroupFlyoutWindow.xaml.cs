@@ -14,6 +14,7 @@ public partial class GroupFlyoutWindow : Window
     private bool _closeAnimationStarted;
     private bool _allowClose;
     private bool _hasOpenContextMenu;
+    private DateTime _suppressOutsideDismissUntilUtc;
 
     public GroupFlyoutWindow(GroupFlyoutWindowViewModel viewModel)
     {
@@ -73,12 +74,17 @@ public partial class GroupFlyoutWindow : Window
     private void OnContextMenuClosing(object sender, ContextMenuEventArgs e)
     {
         _hasOpenContextMenu = false;
+        _suppressOutsideDismissUntilUtc = DateTime.UtcNow.AddMilliseconds(500);
     }
 
     private void OnContextMenuClosed(object? sender, RoutedEventArgs e)
     {
         _hasOpenContextMenu = false;
+        _suppressOutsideDismissUntilUtc = DateTime.UtcNow.AddMilliseconds(500);
     }
+
+    public bool SuppressOutsideDismiss =>
+        _hasOpenContextMenu || DateTime.UtcNow < _suppressOutsideDismissUntilUtc;
 
     private void OnKeyDown(object sender, KeyEventArgs e)
     {

@@ -151,7 +151,11 @@ public partial class MainWindow : Window
 
     private void OnPanelListItemDragOver(object sender, DragEventArgs e)
     {
-        e.Effects = IsSupportedDrag(e) ? DragDropEffects.Move : DragDropEffects.None;
+        e.Effects = DroppedPathExtractor.HasPaths(e.Data)
+            ? DragDropEffects.Copy
+            : e.Data.GetDataPresent(typeof(LauncherItemEditorItemViewModel))
+                ? DragDropEffects.Move
+                : DragDropEffects.None;
         e.Handled = true;
     }
 
@@ -162,8 +166,17 @@ public partial class MainWindow : Window
             return;
         }
 
+        var droppedPaths = DroppedPathExtractor.ExtractPaths(e.Data);
+        if (droppedPaths.Count > 0)
+        {
+            e.Handled = true;
+            viewModel.Workspace.AddDroppedPathsToPanel(panel.Id, droppedPaths);
+            return;
+        }
+
         if (TryGetDraggedItem(e, out var draggedItem))
         {
+            e.Handled = true;
             viewModel.Workspace.MoveItemToPanel(draggedItem.Id, panel.Id);
         }
     }

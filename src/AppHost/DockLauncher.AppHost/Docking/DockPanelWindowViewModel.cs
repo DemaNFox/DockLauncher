@@ -48,6 +48,10 @@ public sealed partial class DockPanelWindowViewModel : ViewModelBase
     private readonly Func<Guid, Guid?, Task> _moveWithinPanelAsync;
     private readonly Func<bool> _hasOpenFlyouts;
     private readonly Action _exit;
+    private readonly Func<Guid, IReadOnlyList<string>, Task> _addDroppedPathsToGroupAsync;
+    private readonly Func<Guid, Guid, Guid?, Task> _moveDockItemAsync;
+    private readonly Func<Guid, Guid, Guid, Task> _moveDockItemToGroupAsync;
+    private readonly Func<IReadOnlyList<string>, Guid?, Task> _addDroppedPathsAtAsync;
 
     public DockPanelWindowViewModel(
         Guid panelId,
@@ -115,7 +119,11 @@ public sealed partial class DockPanelWindowViewModel : ViewModelBase
         Func<DockPanelItemViewModel, DockPanelMoveTargetViewModel, Task> moveToPanelAsync,
         Func<Guid, Guid?, Task> moveWithinPanelAsync,
         Func<bool> hasOpenFlyouts,
-        Action exit)
+        Action exit,
+        Func<Guid, IReadOnlyList<string>, Task>? addDroppedPathsToGroupAsync = null,
+        Func<Guid, Guid, Guid?, Task>? moveDockItemAsync = null,
+        Func<Guid, Guid, Guid, Task>? moveDockItemToGroupAsync = null,
+        Func<IReadOnlyList<string>, Guid?, Task>? addDroppedPathsAtAsync = null)
     {
         PanelId = panelId;
         Title = title;
@@ -185,6 +193,10 @@ public sealed partial class DockPanelWindowViewModel : ViewModelBase
         _moveWithinPanelAsync = moveWithinPanelAsync;
         _hasOpenFlyouts = hasOpenFlyouts;
         _exit = exit;
+        _addDroppedPathsToGroupAsync = addDroppedPathsToGroupAsync ?? ((_, _) => Task.CompletedTask);
+        _moveDockItemAsync = moveDockItemAsync ?? ((_, itemId, targetItemId) => _moveWithinPanelAsync(itemId, targetItemId));
+        _moveDockItemToGroupAsync = moveDockItemToGroupAsync ?? ((_, _, _) => Task.CompletedTask);
+        _addDroppedPathsAtAsync = addDroppedPathsAtAsync ?? ((paths, _) => _addDroppedPathsAsync(paths));
 
         foreach (var item in Items)
         {
@@ -451,9 +463,40 @@ public sealed partial class DockPanelWindowViewModel : ViewModelBase
         return _addDroppedPathsAsync(paths);
     }
 
+    public Task AddDroppedPathsAtAsync(IReadOnlyList<string> paths, Guid? targetItemId)
+    {
+        return _addDroppedPathsAtAsync(paths, targetItemId);
+    }
+
+    public Task AddDroppedPathsAsync(
+        IReadOnlyList<string> paths,
+        DockPanelItemViewModel targetItem,
+        bool isDirectLauncherHit)
+    {
+        return isDirectLauncherHit && targetItem.TryGetGroupId(out var groupId)
+            ? _addDroppedPathsToGroupAsync(groupId, paths)
+            : _addDroppedPathsAsync(paths);
+    }
+
     public Task MoveItemWithinPanelAsync(Guid itemId, Guid? targetItemId)
     {
         return _moveWithinPanelAsync(itemId, targetItemId);
+    }
+
+    public Task DropDockItemAsync(
+        Guid sourcePanelId,
+        Guid itemId,
+        DockPanelItemViewModel? targetItem,
+        bool isDirectLauncherHit = false)
+    {
+        if (isDirectLauncherHit
+            && targetItem is not null
+            && targetItem.TryGetGroupId(out var groupId))
+        {
+            return _moveDockItemToGroupAsync(sourcePanelId, itemId, groupId);
+        }
+
+        return _moveDockItemAsync(sourcePanelId, itemId, targetItem?.Id);
     }
 
     public Task UpdatePanelPositionAsync(
@@ -849,6 +892,19 @@ public sealed partial class DockPanelItemViewModel : ObservableObject
     };
 
     public string Target { get; }
+
+    public bool TryGetGroupId(out Guid groupId)
+    {
+        const string prefix = "group:";
+        if (Target.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            && Guid.TryParse(Target[prefix.Length..], out groupId))
+        {
+            return true;
+        }
+
+        groupId = Guid.Empty;
+        return false;
+    }
 
     public string? Arguments { get; }
 
