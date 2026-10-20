@@ -5,6 +5,8 @@ using DockLauncher.BuildingBlocks.Infrastructure.FileSystem;
 using DockLauncher.AppHost.Hosting;
 using DockLauncher.AppHost.Hotkeys;
 using DockLauncher.AppHost.Tray;
+using DockLauncher.Modules.Settings.Application;
+using DockLauncher.Modules.Settings.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -25,6 +27,12 @@ public partial class App : Application
         _host.Services.GetRequiredService<DockTrayIcon>().Initialize();
         var dockShellController = _host.Services.GetRequiredService<IDockShellController>();
         await dockShellController.RefreshAsync();
+
+        if (_host.Services.GetRequiredService<IWorkspaceStore>() is JsonWorkspaceStore store
+            && store.ConsumeRecoveryNotice() is { } notice)
+        {
+            MessageBox.Show(notice, "DocSoft workspace recovered", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
 
         ShowConfiguratorOnFirstRun(_host.Services, dockShellController);
     }

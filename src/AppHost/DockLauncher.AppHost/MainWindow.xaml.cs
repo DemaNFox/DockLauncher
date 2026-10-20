@@ -254,8 +254,8 @@ public partial class MainWindow : Window
 public sealed partial class MainWindowViewModel : ObservableObject
 {
     public const int DesignTabIndex = 0;
-    public const int GroupsTabIndex = 1;
-    public const int LaunchProfilesTabIndex = 2;
+    public const int GroupsTabIndex = 2;
+    public const int LaunchProfilesTabIndex = 3;
 
     public MainWindowViewModel(WorkspaceEditorViewModel workspace)
     {

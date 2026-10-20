@@ -1028,8 +1028,8 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
     [RelayCommand]
     private async Task ReloadAsync()
     {
-        await FlushPendingChangesAsync();
-        await LoadAsync();
+        await DiscardChangesAsync();
+        StatusMessage = "Workspace reloaded from disk.";
     }
 
     public async Task DiscardChangesAsync(CancellationToken cancellationToken = default)
@@ -1063,10 +1063,21 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
             return;
         }
 
-        await FlushPendingChangesAsync();
-        var workspace = await _workspaceStore.ImportAsync(path, CancellationToken.None);
-        await _saveWorkspaceCommandHandler.HandleAsync(new SaveWorkspaceCommand(workspace), CancellationToken.None);
-        await LoadAsync();
+        CancelScheduledAutoSave();
+        _changeVersion++;
+        await _saveGate.WaitAsync();
+        Workspace workspace;
+        try
+        {
+            workspace = await _workspaceStore.ImportAsync(path, CancellationToken.None);
+            await _saveWorkspaceCommandHandler.HandleAsync(new SaveWorkspaceCommand(workspace), CancellationToken.None);
+            ApplyWorkspaceToEditor(workspace, markUnsaved: false, "Workspace imported.");
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
+
         await _dockShellController.RefreshAsync();
         UpdateSummary(workspace);
         StatusMessage = $"Workspace imported from '{path}'.";
@@ -1075,9 +1086,20 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
     [RelayCommand]
     private async Task ResetLayoutAsync()
     {
-        await FlushPendingChangesAsync();
-        var workspace = await _workspaceStore.ResetAsync(CancellationToken.None);
-        await LoadAsync();
+        CancelScheduledAutoSave();
+        _changeVersion++;
+        await _saveGate.WaitAsync();
+        Workspace workspace;
+        try
+        {
+            workspace = await _workspaceStore.ResetAsync(CancellationToken.None);
+            ApplyWorkspaceToEditor(workspace, markUnsaved: false, "Workspace reset.");
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
+
         await _dockShellController.RefreshAsync();
         UpdateSummary(workspace);
         StatusMessage = "Workspace reset to default layout.";

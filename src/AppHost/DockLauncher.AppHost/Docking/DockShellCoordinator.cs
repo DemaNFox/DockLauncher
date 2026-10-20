@@ -54,6 +54,7 @@ public sealed class DockShellCoordinator : IDockShellController
     private readonly Dictionary<Guid, GroupFlyoutWindow> _groupWindows = [];
     private readonly Dictionary<string, FolderFlyoutWindow> _folderWindows = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<Guid> _hiddenPanelIds = [];
+    private Workspace? _appliedWorkspace;
     private readonly DispatcherTimer _foregroundWindowTimer;
     private readonly DispatcherTimer _flyoutDismissTimer;
     private bool _leftMouseWasDown;
@@ -114,6 +115,11 @@ public sealed class DockShellCoordinator : IDockShellController
             await _dockGlobalHotkey.RefreshRegistrationAsync(cancellationToken);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var panelsToRefresh = WorkspaceVisualChangeDetector.PanelsToRefresh(_appliedWorkspace, workspace, refreshHotkeyRegistration);
+        var closeFlyouts = WorkspaceVisualChangeDetector.ShouldCloseFlyouts(_appliedWorkspace, workspace, refreshHotkeyRegistration);
+
         var workspacePanelIds = workspace.Panels.Select(panel => panel.Id).ToHashSet();
         _hiddenPanelIds.RemoveWhere(panelId => !workspacePanelIds.Contains(panelId));
         foreach (var panel in workspace.Panels)
@@ -128,8 +134,7 @@ public sealed class DockShellCoordinator : IDockShellController
             }
         }
 
-        var panels = workspace.Panels.Select(panel => BuildDockPanelViewModel(panel, workspace)).ToArray();
-        var currentPanelIds = panels.Select(panel => panel.PanelId).ToHashSet();
+        var currentPanelIds = workspace.Panels.Select(panel => panel.Id).ToHashSet();
 
         foreach (var panelId in _panelWindows.Keys.Where(panelId => !currentPanelIds.Contains(panelId)).ToArray())
         {
@@ -138,22 +143,19 @@ public sealed class DockShellCoordinator : IDockShellController
             _hiddenPanelIds.Remove(panelId);
         }
 
-        foreach (var window in _groupWindows.Values.ToArray())
+        if (closeFlyouts)
         {
-            window.CloseImmediately();
+            CloseFlyoutWindows();
         }
 
-        _groupWindows.Clear();
-
-        foreach (var window in _folderWindows.Values.ToArray())
+        foreach (var panel in workspace.Panels)
         {
-            window.Close();
-        }
+            if (!panelsToRefresh.Contains(panel.Id) && _panelWindows.ContainsKey(panel.Id))
+            {
+                continue;
+            }
 
-        _folderWindows.Clear();
-
-        foreach (var panelViewModel in panels)
-        {
+            var panelViewModel = BuildDockPanelViewModel(panel, workspace);
             if (_panelWindows.TryGetValue(panelViewModel.PanelId, out var existingWindow))
             {
                 existingWindow.UpdateViewModel(panelViewModel);
@@ -165,6 +167,8 @@ public sealed class DockShellCoordinator : IDockShellController
             _panelWindows.Add(panelViewModel.PanelId, window);
             SyncPanelWindowVisibility(window, panelViewModel.PanelId);
         }
+
+        _appliedWorkspace = workspace;
     }
 
     private void SyncPanelWindowVisibility(DockPanelWindow window, Guid panelId)
@@ -529,11 +533,25 @@ public sealed class DockShellCoordinator : IDockShellController
                 workspace.Groups,
                 workspace.LaunchProfiles);
 
-            await CommitRuntimeWorkspaceAsync(updatedWorkspace, "Hidden panels restored.", CancellationToken.None);
+            var configuratorWorkspace = GetVisibleConfiguratorWorkspace();
+            if (configuratorWorkspace is not null)
+            {
+                await configuratorWorkspace.FlushPendingChangesAsync();
+            }
+
+            await _workspaceStore.SaveAsync(updatedWorkspace, CancellationToken.None);
+            if (configuratorWorkspace is not null)
+            {
+                await configuratorWorkspace.LoadAsync();
+            }
+
+            await RefreshAsync();
         }
-        catch
+        catch (Exception exception)
         {
-            // The tray command must not tear down the application on persistence failures.
+            MessageBox.Show($"Could not restore hidden panels: {exception.Message}",
+                "DocSoft", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
         }
 
         _hiddenPanelIds.Clear();
@@ -630,6 +648,10 @@ public sealed class DockShellCoordinator : IDockShellController
     private DockPanelWindowViewModel BuildDockPanelViewModel(Modules.Panels.Domain.Panel panel, Workspace workspace)
     {
         var itemById = workspace.Items.ToDictionary(item => item.Id);
+        var moveTargets = workspace.Panels
+            .Where(candidate => candidate.Id != panel.Id)
+            .Select(candidate => new DockPanelMoveTargetViewModel(candidate.Id, candidate.Name))
+            .ToArray();
         var items = panel.ItemIds
             .Where(itemById.ContainsKey)
             .Select(itemId => itemById[itemId])
@@ -641,10 +663,7 @@ public sealed class DockShellCoordinator : IDockShellController
                 item.Arguments,
                 item.RunAsAdministrator,
                 _iconProvider.GetIcon(item.Type, item.Target, item.IconPath),
-                workspace.Panels
-                    .Where(candidate => candidate.Id != panel.Id)
-                    .Select(candidate => new DockPanelMoveTargetViewModel(candidate.Id, candidate.Name))
-                    .ToArray()))
+                moveTargets))
             .ToArray();
 
         var metrics = CalculateMetrics(panel, items.Length);

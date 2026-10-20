@@ -3,49 +3,41 @@ param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
     [switch]$Installer,
-    [string]$Version = "1.0.0"
+    [string]$Version = "1.0.6"
 )
 
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-$packageRoot = Join-Path $root "build\DockLauncher"
-$appOutput = Join-Path $packageRoot "app"
-$launcherOutput = Join-Path $root "build\DockLauncherLauncher"
 $installerScript = Join-Path $root "installer\DockLauncher.iss"
 $installerOutput = Join-Path $root "artifacts\installer"
 
-if (Test-Path $packageRoot) {
-    Remove-Item -Recurse -Force $packageRoot
+if ($Installer -and $Runtime -ne "win-x64") {
+    throw "The installer currently supports win-x64 only."
 }
-
-if (Test-Path $launcherOutput) {
-    Remove-Item -Recurse -Force $launcherOutput
-}
-
-New-Item -ItemType Directory -Force -Path $appOutput | Out-Null
 
 dotnet publish `
     (Join-Path $root "src\AppHost\DockLauncher.AppHost\DockLauncher.AppHost.csproj") `
     -c $Configuration `
     -r $Runtime `
     --self-contained true `
-    -o $appOutput `
+    /p:Version=$Version `
     /p:PublishSingleFile=false `
     /p:DebugSymbols=false `
     /p:DebugType=none
+if ($LASTEXITCODE -ne 0) { throw "DocSoft application publish failed." }
 
 dotnet publish `
     (Join-Path $root "src\AppHost\DockLauncher.Launcher\DockLauncher.Launcher.csproj") `
     -c $Configuration `
     -r $Runtime `
     --self-contained true `
-    -o $launcherOutput
+    /p:Version=$Version `
+    /p:DebugSymbols=false `
+    /p:DebugType=none
+if ($LASTEXITCODE -ne 0) { throw "DocSoft launcher publish failed." }
 
-Copy-Item -Force (Join-Path $launcherOutput "DockLauncher.exe") (Join-Path $packageRoot "DockLauncher.exe")
-Remove-Item -Recurse -Force $launcherOutput
-
-Write-Host "DockLauncher package created at $packageRoot"
+Write-Host "DocSoft publish outputs created for $Runtime."
 
 if (-not $Installer) {
     Write-Host "Run with -Installer to create a Windows installer with Inno Setup."
@@ -60,7 +52,8 @@ $iscc = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
 if ($null -eq $iscc) {
     $candidatePaths = @(
         "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
-        "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+        "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
     )
 
     $isccPath = $candidatePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
@@ -73,6 +66,7 @@ else {
 }
 
 New-Item -ItemType Directory -Force -Path $installerOutput | Out-Null
-& $isccPath "/DAppVersion=$Version" $installerScript
+& $isccPath "/DAppVersion=$Version" "/DTargetRuntime=$Runtime" "/DBuildConfiguration=$Configuration" $installerScript
+if ($LASTEXITCODE -ne 0) { throw "DocSoft installer compilation failed." }
 
-Write-Host "DockLauncher installer created at $installerOutput"
+Write-Host "DocSoft installer created at $installerOutput"

@@ -65,6 +65,45 @@ public class JsonWorkspaceStoreTests
     }
 
     [Fact]
+    public async Task LoadAsync_ShouldRestoreBackupAndPreserveDamagedWorkspace()
+    {
+        var root = @"C:\Users\Test\AppData\Roaming\DockLauncher";
+        var fileSystem = new MockFileSystem();
+        var store = new JsonWorkspaceStore(fileSystem, new SystemTextJsonSerializer(), new AppDataPaths(root));
+        var first = new Panel(Guid.NewGuid(), "Previous", PanelPosition.Bottom, PanelLayoutMode.IconOnly, new PanelAppearance(0.9, 40, true, false, false));
+        var second = new Panel(Guid.NewGuid(), "Current", PanelPosition.Bottom, PanelLayoutMode.IconOnly, new PanelAppearance(0.9, 40, true, false, false));
+
+        await store.SaveAsync(new Workspace(1, new AppSettings("en", "system", false, "Alt+Space"), new[] { first }, [], [], []), CancellationToken.None);
+        await store.SaveAsync(new Workspace(1, new AppSettings("en", "system", false, "Alt+Space"), new[] { second }, [], [], []), CancellationToken.None);
+        fileSystem.File.WriteAllText(Path.Combine(root, "workspace.json"), "{ invalid json");
+
+        var restored = await store.LoadAsync(CancellationToken.None);
+
+        restored.Panels.Should().ContainSingle(panel => panel.Name == "Previous");
+        (await store.LoadAsync(CancellationToken.None)).Panels.Should().ContainSingle(panel => panel.Name == "Previous");
+        fileSystem.Directory.GetFiles(root, "workspace.json.corrupt-*.json").Should().ContainSingle();
+        store.ConsumeRecoveryNotice().Should().Contain("previous saved version");
+        store.ConsumeRecoveryNotice().Should().BeNull();
+    }
+
+    [Fact]
+    public async Task LoadAsync_ShouldCreateDefaultsOnlyAfterPreservingDamagedWorkspace()
+    {
+        var root = @"C:\Users\Test\AppData\Roaming\DockLauncher";
+        var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "workspace.json")] = new("{ invalid json")
+        });
+        var store = new JsonWorkspaceStore(fileSystem, new SystemTextJsonSerializer(), new AppDataPaths(root));
+
+        var restored = await store.LoadAsync(CancellationToken.None);
+
+        restored.Panels.Should().ContainSingle(panel => panel.Name == "Starter");
+        fileSystem.Directory.GetFiles(root, "workspace.json.corrupt-*.json").Should().ContainSingle();
+        store.LastRecoveryNotice.Should().Contain("default workspace");
+    }
+
+    [Fact]
     public async Task SaveAsync_ThenLoadAsync_ShouldPreservePanelAppearance()
     {
         var root = @"C:\Users\Test\AppData\Roaming\DockLauncher";

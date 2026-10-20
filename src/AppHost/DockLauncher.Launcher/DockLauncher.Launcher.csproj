@@ -6,7 +6,8 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <AssemblyName>DockLauncher</AssemblyName>
-    <Product>DockLauncher</Product>
+    <Product>DocSoft</Product>
+    <ApplicationIcon>..\DockLauncher.AppHost\Resources\DocSoft.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>false</SelfContained>
     <DebugSymbols>false</DebugSymbols>

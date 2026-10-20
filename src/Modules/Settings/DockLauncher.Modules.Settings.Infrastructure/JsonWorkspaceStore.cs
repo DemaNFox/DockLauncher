@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using System.Text.Json;
 using DockLauncher.BuildingBlocks.Application.Contracts;
 using DockLauncher.BuildingBlocks.Infrastructure.FileSystem;
 using DockLauncher.Modules.Groups.Domain;
@@ -46,6 +47,16 @@ public sealed class JsonWorkspaceStore : IWorkspaceStore
     private readonly IFileSystem _fileSystem;
     private readonly IJsonSerializer _jsonSerializer;
     private readonly AppDataPaths _paths;
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
+
+    public string? LastRecoveryNotice { get; private set; }
+
+    public string? ConsumeRecoveryNotice()
+    {
+        var notice = LastRecoveryNotice;
+        LastRecoveryNotice = null;
+        return notice;
+    }
 
     public JsonWorkspaceStore(IFileSystem fileSystem, IJsonSerializer jsonSerializer, AppDataPaths paths)
     {
@@ -58,31 +69,78 @@ public sealed class JsonWorkspaceStore : IWorkspaceStore
     {
         if (!_fileSystem.File.Exists(_paths.WorkspaceFilePath))
         {
+            var restored = await TryLoadBackupAsync(cancellationToken);
+            if (restored is not null)
+            {
+                await SaveAsync(restored, cancellationToken);
+                LastRecoveryNotice = "The workspace file was missing. DocSoft restored the previous saved version from its backup.";
+                return restored;
+            }
+
             var workspace = CreateDefaultWorkspace();
             await SaveAsync(workspace, cancellationToken);
             return workspace;
         }
 
-        var json = await _fileSystem.File.ReadAllTextAsync(_paths.WorkspaceFilePath, cancellationToken);
-        var storage = _jsonSerializer.Deserialize<WorkspaceStorageModel>(json);
-        return storage is null ? CreateDefaultWorkspace() : MapToDomain(storage);
+        try
+        {
+            return await ReadWorkspaceAsync(_paths.WorkspaceFilePath, cancellationToken);
+        }
+        catch (Exception exception) when (IsInvalidWorkspace(exception))
+        {
+            var damagedPath = _paths.WorkspaceFilePath + ".corrupt-" + Guid.NewGuid().ToString("N") + ".json";
+            _fileSystem.File.Move(_paths.WorkspaceFilePath, damagedPath);
+
+            var restored = await TryLoadBackupAsync(cancellationToken);
+            if (restored is not null)
+            {
+                await SaveAsync(restored, cancellationToken);
+                LastRecoveryNotice = $"The workspace file was invalid. DocSoft restored the previous saved version. The damaged file was preserved at {damagedPath}.";
+                return restored;
+            }
+
+            var workspace = CreateDefaultWorkspace();
+            await SaveAsync(workspace, cancellationToken);
+            LastRecoveryNotice = $"The workspace file was invalid and no usable backup was available. DocSoft created a default workspace. The damaged file was preserved at {damagedPath}.";
+            return workspace;
+        }
     }
 
     public async Task SaveAsync(Workspace workspace, CancellationToken cancellationToken)
     {
-        _fileSystem.Directory.CreateDirectory(_paths.Root);
-        var temporaryPath = _paths.WorkspaceFilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        await _writeGate.WaitAsync(cancellationToken);
         try
         {
-            await WriteWorkspaceAsync(workspace, temporaryPath, cancellationToken);
-            _fileSystem.File.Move(temporaryPath, _paths.WorkspaceFilePath, overwrite: true);
+            _fileSystem.Directory.CreateDirectory(_paths.Root);
+            var temporaryPath = _paths.WorkspaceFilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            var backupTemporaryPath = BackupFilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await WriteWorkspaceAsync(workspace, temporaryPath, cancellationToken);
+                if (_fileSystem.File.Exists(_paths.WorkspaceFilePath))
+                {
+                    _fileSystem.File.Copy(_paths.WorkspaceFilePath, backupTemporaryPath);
+                    _fileSystem.File.Move(backupTemporaryPath, BackupFilePath, overwrite: true);
+                }
+
+                _fileSystem.File.Move(temporaryPath, _paths.WorkspaceFilePath, overwrite: true);
+            }
+            finally
+            {
+                if (_fileSystem.File.Exists(temporaryPath))
+                {
+                    _fileSystem.File.Delete(temporaryPath);
+                }
+
+                if (_fileSystem.File.Exists(backupTemporaryPath))
+                {
+                    _fileSystem.File.Delete(backupTemporaryPath);
+                }
+            }
         }
         finally
         {
-            if (_fileSystem.File.Exists(temporaryPath))
-            {
-                _fileSystem.File.Delete(temporaryPath);
-            }
+            _writeGate.Release();
         }
     }
 
@@ -93,9 +151,7 @@ public sealed class JsonWorkspaceStore : IWorkspaceStore
 
     public async Task<Workspace> ImportAsync(string path, CancellationToken cancellationToken)
     {
-        var json = await _fileSystem.File.ReadAllTextAsync(path, cancellationToken);
-        var storage = _jsonSerializer.Deserialize<WorkspaceStorageModel>(json);
-        return storage is null ? CreateDefaultWorkspace() : MapToDomain(storage);
+        return await ReadWorkspaceAsync(path, cancellationToken);
     }
 
     public async Task<Workspace> ResetAsync(CancellationToken cancellationToken)
@@ -104,6 +160,40 @@ public sealed class JsonWorkspaceStore : IWorkspaceStore
         await SaveAsync(workspace, cancellationToken);
         return workspace;
     }
+
+    private string BackupFilePath => _paths.WorkspaceFilePath + ".bak";
+
+    private async Task<Workspace?> TryLoadBackupAsync(CancellationToken cancellationToken)
+    {
+        if (!_fileSystem.File.Exists(BackupFilePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await ReadWorkspaceAsync(BackupFilePath, cancellationToken);
+        }
+        catch (Exception exception) when (IsInvalidWorkspace(exception))
+        {
+            return null;
+        }
+    }
+
+    private async Task<Workspace> ReadWorkspaceAsync(string path, CancellationToken cancellationToken)
+    {
+        var json = await _fileSystem.File.ReadAllTextAsync(path, cancellationToken);
+        var storage = _jsonSerializer.Deserialize<WorkspaceStorageModel>(json);
+        if (storage is null || storage.Settings is null || storage.Panels is null || storage.Items is null)
+        {
+            throw new JsonException("Workspace is missing required fields.");
+        }
+
+        return MapToDomain(storage);
+    }
+
+    private static bool IsInvalidWorkspace(Exception exception) =>
+        exception is JsonException or ArgumentException or InvalidOperationException or NullReferenceException;
 
     private static Workspace MapToDomain(WorkspaceStorageModel storage)
     {

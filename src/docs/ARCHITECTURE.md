@@ -18,6 +18,7 @@
 
 - System settings: `appsettings.json`
 - User workspace: `%AppData%/DockLauncher/workspace.json`
+- The previous saved workspace is kept as `workspace.json.bak`. A malformed workspace is preserved as `workspace.json.corrupt-*.json`; startup restores the backup or creates defaults and displays a recovery notice.
 
 ## Composition
 

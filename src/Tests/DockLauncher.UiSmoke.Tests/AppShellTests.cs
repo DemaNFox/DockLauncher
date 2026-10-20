@@ -27,6 +27,18 @@ public class AppShellTests
     }
 
     [Fact]
+    public void MainWindowViewModel_ShouldNavigateToGroupsAndProfilesTabs()
+    {
+        var viewModel = new MainWindowViewModel(CreateWorkspaceEditor(new StubWorkspaceStore()));
+
+        viewModel.ShowGroupsEditor();
+        viewModel.SelectedEditorTabIndex.Should().Be(2);
+
+        viewModel.ShowLaunchProfilesEditor();
+        viewModel.SelectedEditorTabIndex.Should().Be(3);
+    }
+
+    [Fact]
     public async Task WorkspaceEditor_ShouldAddPanelAndItem()
     {
         var store = new StubWorkspaceStore();
@@ -204,6 +216,24 @@ public class AppShellTests
         workspace.HasUnsavedChanges.Should().BeFalse();
         workspace.Panels.Single().Name.Should().Be("Work");
         dockShellController.RefreshCalls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task WorkspaceEditor_ReloadShouldDiscardPendingEditAndReadDisk()
+    {
+        var originalPanel = new Panel(Guid.NewGuid(), "Original", PanelPosition.Bottom, PanelLayoutMode.IconOnly, new PanelAppearance(0.9, 40, true, false, false));
+        var diskPanel = new Panel(Guid.NewGuid(), "From disk", PanelPosition.Bottom, PanelLayoutMode.IconOnly, new PanelAppearance(0.9, 40, true, false, false));
+        var store = new StubWorkspaceStore(new Workspace(1, new AppSettings("en", "system", false, "Alt+Space"), new[] { originalPanel }, [], [], []));
+        var workspace = CreateWorkspaceEditor(store);
+
+        await workspace.LoadAsync();
+        workspace.SelectedPanel!.Name = "Pending edit";
+        store.SetPersistedWorkspace(new Workspace(1, new AppSettings("en", "system", false, "Alt+Space"), new[] { diskPanel }, [], [], []));
+        await workspace.ReloadCommand.ExecuteAsync(null);
+
+        workspace.Panels.Should().ContainSingle(panel => panel.Name == "From disk");
+        store.LastSavedWorkspace.Should().BeNull();
+        workspace.HasUnsavedChanges.Should().BeFalse();
     }
 
     [Fact]
@@ -1518,6 +1548,8 @@ public class AppShellTests
         }
 
         public Workspace? LastSavedWorkspace { get; private set; }
+
+        public void SetPersistedWorkspace(Workspace workspace) => _workspace = workspace;
 
         public bool FailSaves { get; set; }
 

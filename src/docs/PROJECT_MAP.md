@@ -44,6 +44,8 @@ Look here for:
   `Docking/FolderFlyoutWindow.xaml`
 - Runtime dock orchestration:
   `Docking/DockShellCoordinator.cs`
+- Runtime preview change detection:
+  `Docking/WorkspaceVisualChangeDetector.cs`
 - Dialogs and pickers:
   `Dialogs/`
 - Shared visual resources for the app host:

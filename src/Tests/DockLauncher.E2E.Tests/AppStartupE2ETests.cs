@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using System.Windows.Automation;
 using DockLauncher.BuildingBlocks.Infrastructure.FileSystem;
 using FluentAssertions;
@@ -31,6 +32,36 @@ public sealed class AppStartupE2ETests
             var configurator = await WaitForWindowAsync(process.Id, "DocSoft — Workspace", TimeSpan.FromSeconds(15));
 
             configurator.Should().NotBeNull();
+            process.HasExited.Should().BeFalse();
+        }
+        finally
+        {
+            KillProcess(process);
+            TryDeleteDirectory(dataRoot);
+        }
+    }
+
+    [Fact]
+    public async Task DamagedWorkspace_ShouldRecoverWithoutExitingAndPreserveOriginal()
+    {
+        var appExe = ResolveAppExe();
+        var dataRoot = Path.Combine(Path.GetTempPath(), "DockLauncher.E2E", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dataRoot);
+        File.WriteAllText(Path.Combine(dataRoot, "workspace.json"), "{ invalid json");
+
+        using var process = StartApp(appExe, dataRoot);
+        try
+        {
+            await WaitUntilAsync(
+                () => Directory.GetFiles(dataRoot, "workspace.json.corrupt-*.json").Length == 1
+                    && File.Exists(Path.Combine(dataRoot, "workspace.json")),
+                TimeSpan.FromSeconds(15),
+                "The damaged workspace was not preserved and recovered.");
+
+            using var recovered = JsonDocument.Parse(File.ReadAllText(Path.Combine(dataRoot, "workspace.json")));
+            recovered.RootElement.GetProperty("panels").GetArrayLength().Should().BeGreaterThan(0);
+            (await WaitForWindowAsync(process.Id, "DocSoft workspace recovered", TimeSpan.FromSeconds(15)))
+                .Should().NotBeNull();
             process.HasExited.Should().BeFalse();
         }
         finally
