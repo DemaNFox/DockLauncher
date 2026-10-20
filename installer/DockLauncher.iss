@@ -1,6 +1,6 @@
 #define AppName "DocSoft"
 #ifndef AppVersion
-#define AppVersion "1.0.6"
+#define AppVersion "1.0.7"
 #endif
 #define AppPublisher "DemaNFox"
 #ifndef TargetRuntime
