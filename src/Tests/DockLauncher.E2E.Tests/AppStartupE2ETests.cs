@@ -32,6 +32,21 @@ public sealed class AppStartupE2ETests
             var configurator = await WaitForWindowAsync(process.Id, "DocSoft — Workspace", TimeSpan.FromSeconds(15));
 
             configurator.Should().NotBeNull();
+            var maximizeButton = configurator!.FindFirst(TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.AutomationIdProperty, "MaximizeRestoreButton"));
+            maximizeButton.Should().NotBeNull("the configurator should expose its styled window controls");
+            var windowPattern = (WindowPattern)configurator.GetCurrentPattern(WindowPattern.Pattern);
+            var invokePattern = (InvokePattern)maximizeButton!.GetCurrentPattern(InvokePattern.Pattern);
+            invokePattern.Invoke();
+            await WaitUntilAsync(
+                () => windowPattern.Current.WindowVisualState == WindowVisualState.Maximized,
+                TimeSpan.FromSeconds(5),
+                "The custom maximize button did not maximize the configurator.");
+            invokePattern.Invoke();
+            await WaitUntilAsync(
+                () => windowPattern.Current.WindowVisualState == WindowVisualState.Normal,
+                TimeSpan.FromSeconds(5),
+                "The custom maximize button did not restore the configurator.");
             process.HasExited.Should().BeFalse();
         }
         finally

@@ -38,6 +38,7 @@ Look here for:
 
 - WPF application startup: `App.xaml`, `Program.cs`
 - Main configurator window: `MainWindow.xaml`, `MainWindow.xaml.cs`
+  Its dark title bar uses WPF `WindowChrome`; the window keeps native drag, resize, and maximize behavior while rendering its own controls.
 - Runtime dock windows:
   `Docking/DockPanelWindow.xaml`
   `Docking/GroupFlyoutWindow.xaml`

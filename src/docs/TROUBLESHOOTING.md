@@ -4,6 +4,18 @@
 
 This file records build and project issues already encountered in this repository, plus the exact direction that helped resolve them. Check this file before debugging the same class of problem again.
 
+## 2026-10-20: Old shortcuts remain in the configurator
+
+### Symptoms
+
+- The configurator lists shortcuts that the user no longer sees or uses on a dock panel.
+
+### Cause and resolution
+
+- The configurator reads the panel's saved `itemIds` from `%APPDATA%\DockLauncher\workspace.json`. A hidden or overflowed shortcut can still be in that list; the editor does not infer deletion from a missing target file.
+- Inspect the saved panel references and item targets before changing anything. Do not automatically delete all missing targets: network, removable, and temporarily unavailable paths may be intentional.
+- Close DocSoft, back up `workspace.json`, and remove only the identified obsolete item IDs from the affected panel and global `items` list after checking that no other panel, group, or launch profile references them. Update `workspace.json.bak` to the cleaned state so recovery does not revive the entries. Restart DocSoft and verify the panel count.
+
 ## 2026-04-24: `dotnet build` looked broken with no clear error text
 
 ### Symptoms
