@@ -208,13 +208,6 @@
         <Border.BorderBrush>
             <Binding Path="PanelBorderBrush" />
         </Border.BorderBrush>
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="28"
-                              ShadowDepth="0"
-                              Opacity="0.42"
-                              Color="#FF020617" />
-        </Border.Effect>
-
         <Grid>
             <Border x:Name="PanelHoverOverlay"
                     Background="{Binding IconHoverBackgroundBrush}"
@@ -251,6 +244,7 @@
                                 <Border x:Name="DockItemContainer"
                                         AllowDrop="True"
                                         Background="Transparent"
+                                        Tag="{Binding DataContext.ShowConfiguratorCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         BorderBrush="Transparent"
                                         BorderThickness="1.5"
                                         Margin="{Binding DataContext.DockItemMargin, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -284,6 +278,9 @@
                                     <MenuItem Command="{Binding DuplicateCommand}" Header="Duplicate Item" />
                                     <MenuItem Command="{Binding DuplicateToNewPanelCommand}" Header="Duplicate To New Panel" />
                                     <MenuItem Command="{Binding RemoveCommand}" Header="Remove From Panel" />
+                                    <Separator />
+                                    <MenuItem Header="Open DocSoft"
+                                              Command="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <StackPanel>

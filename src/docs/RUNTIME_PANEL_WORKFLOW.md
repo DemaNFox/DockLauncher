@@ -34,6 +34,7 @@ When the configurator is open, runtime panel edits are applied to the configurat
 - Duplicate item
 - Duplicate to new panel
 - Remove from panel
+- Open configurator (the same command available from empty panel space)
 
 ### Item editing dialog
 

@@ -4,6 +4,11 @@
 
 This file records build and project issues already encountered in this repository, plus the exact direction that helped resolve them. Check this file before debugging the same class of problem again.
 
+## 2026-10-20: Rounded dock panel showed square shadow corners
+
+- The dock window is transparent and the panel border is rounded, but its `DropShadowEffect` extended past the border and was clipped by the rectangular window bounds.
+- Remove the outer border shadow when the panel fills its window. The gradient and border still define the panel edge without rectangular clipping artifacts.
+
 ## 2026-10-20: Panel tags had uneven pill shapes
 
 - The position and layout tags in `MainWindow.xaml` used `CornerRadius="999"` on short borders, which distorted their ends.
