@@ -33,10 +33,13 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
     private readonly IWorkspaceStore _workspaceStore;
     private readonly IWorkspaceTransferPicker _workspaceTransferPicker;
     private readonly List<LauncherItemEditorItemViewModel> _allItems = [];
+    private readonly SemaphoreSlim _saveGate = new(1, 1);
     private CancellationTokenSource? _previewCancellationTokenSource;
+    private CancellationTokenSource? _autoSaveCancellationTokenSource;
     private bool _suppressChangeTracking;
     private bool _isLoaded;
     private int _previewRequestVersion;
+    private int _changeVersion;
 
     public WorkspaceEditorViewModel(
         LoadWorkspaceQueryHandler loadWorkspaceQueryHandler,
@@ -277,8 +280,18 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        var workspace = await _loadWorkspaceQueryHandler.HandleAsync(new LoadWorkspaceQuery(), cancellationToken);
-        ApplyWorkspaceToEditor(workspace, markUnsaved: false, $"Workspace loaded from disk at {DateTime.Now:T}.");
+        CancelScheduledAutoSave();
+        _changeVersion++;
+        await _saveGate.WaitAsync(cancellationToken);
+        try
+        {
+            var workspace = await _loadWorkspaceQueryHandler.HandleAsync(new LoadWorkspaceQuery(), cancellationToken);
+            ApplyWorkspaceToEditor(workspace, markUnsaved: false, $"Workspace loaded from disk at {DateTime.Now:T}.");
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
     }
 
     public Workspace CreateWorkspaceSnapshot()
@@ -289,6 +302,7 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
     public async Task ApplyRuntimeWorkspaceAsync(Workspace workspace, string statusMessage, CancellationToken cancellationToken = default, Guid? selectedPanelId = null)
     {
         ApplyWorkspaceToEditor(workspace, markUnsaved: true, statusMessage, selectedPanelId);
+        ScheduleAutoSave();
         await _dockShellController.PreviewWorkspaceAsync(workspace, cancellationToken);
     }
 
@@ -1001,22 +1015,26 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
     [RelayCommand]
     private async Task SaveAsync()
     {
-        var workspace = BuildWorkspace();
-        await _saveWorkspaceCommandHandler.HandleAsync(new SaveWorkspaceCommand(workspace), CancellationToken.None);
+        await FlushPendingChangesAsync();
         await _dockShellController.RefreshAsync();
-        UpdateSummary(workspace);
-        HasUnsavedChanges = false;
-        StatusMessage = $"Workspace saved at {DateTime.Now:T}.";
+    }
+
+    public async Task FlushPendingChangesAsync(CancellationToken cancellationToken = default)
+    {
+        CancelScheduledAutoSave();
+        await PersistWorkspaceAsync(_changeVersion, cancellationToken);
     }
 
     [RelayCommand]
-    private Task ReloadAsync()
+    private async Task ReloadAsync()
     {
-        return LoadAsync();
+        await FlushPendingChangesAsync();
+        await LoadAsync();
     }
 
     public async Task DiscardChangesAsync(CancellationToken cancellationToken = default)
     {
+        CancelScheduledAutoSave();
         await LoadAsync(cancellationToken);
         await _dockShellController.RefreshAsync(cancellationToken);
         HasUnsavedChanges = false;
@@ -1045,6 +1063,7 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
             return;
         }
 
+        await FlushPendingChangesAsync();
         var workspace = await _workspaceStore.ImportAsync(path, CancellationToken.None);
         await _saveWorkspaceCommandHandler.HandleAsync(new SaveWorkspaceCommand(workspace), CancellationToken.None);
         await LoadAsync();
@@ -1056,6 +1075,7 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
     [RelayCommand]
     private async Task ResetLayoutAsync()
     {
+        await FlushPendingChangesAsync();
         var workspace = await _workspaceStore.ResetAsync(CancellationToken.None);
         await LoadAsync();
         await _dockShellController.RefreshAsync();
@@ -1321,6 +1341,78 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
 
         HasUnsavedChanges = true;
         SchedulePreviewRefresh();
+        ScheduleAutoSave();
+    }
+
+    private void CancelScheduledAutoSave()
+    {
+        var pending = _autoSaveCancellationTokenSource;
+        _autoSaveCancellationTokenSource = null;
+        pending?.Cancel();
+    }
+
+    private void ScheduleAutoSave()
+    {
+        CancelScheduledAutoSave();
+        var cancellation = new CancellationTokenSource();
+        _autoSaveCancellationTokenSource = cancellation;
+        var requestVersion = ++_changeVersion;
+        _ = AutoSaveAsync(requestVersion, cancellation);
+    }
+
+    private async Task AutoSaveAsync(int requestVersion, CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(650, cancellation.Token);
+            await PersistWorkspaceAsync(requestVersion, cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception exception)
+        {
+            if (requestVersion == _changeVersion)
+            {
+                HasUnsavedChanges = true;
+                StatusMessage = $"Auto-save failed: {exception.Message}";
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_autoSaveCancellationTokenSource, cancellation))
+            {
+                _autoSaveCancellationTokenSource = null;
+            }
+
+            cancellation.Dispose();
+        }
+    }
+
+    private async Task PersistWorkspaceAsync(int requestVersion, CancellationToken cancellationToken)
+    {
+        await _saveGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!HasUnsavedChanges || requestVersion != _changeVersion)
+            {
+                return;
+            }
+
+            // Once a write starts, let it finish; a newer edit queues the next snapshot.
+            var workspace = BuildWorkspace();
+            await _saveWorkspaceCommandHandler.HandleAsync(new SaveWorkspaceCommand(workspace), CancellationToken.None);
+            if (requestVersion == _changeVersion)
+            {
+                UpdateSummary(workspace);
+                HasUnsavedChanges = false;
+                StatusMessage = $"Saved automatically at {DateTime.Now:T}.";
+            }
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
     }
 
     private void SchedulePreviewRefresh()
@@ -1514,6 +1606,8 @@ public sealed partial class WorkspaceEditorViewModel : ViewModelBase
         RefreshPanelItems();
         RefreshGroupItems();
         RefreshLaunchProfileSteps();
+        RefreshGroupSourcePanelItems();
+        RefreshLaunchProfileSourcePanelItems();
     }
 
     private void RefreshPanelItems()

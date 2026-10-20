@@ -73,6 +73,8 @@ public class AppShellTests
         var workspace = CreateWorkspaceEditor(store, dockShellController);
 
         await workspace.LoadAsync();
+        workspace.GroupSourcePanelItems.Should().ContainSingle(item => item.DisplayName == "Editor");
+        workspace.LaunchProfileSourcePanelItems.Should().ContainSingle(item => item.DisplayName == "Editor");
         workspace.SelectedPanel = workspace.Panels.Single(panel => panel.Name == "Work");
         workspace.SelectedMoveTargetPanel = workspace.Panels.Single(panel => panel.Name == "Media");
         workspace.SelectedPanel.Opacity = 0.62;
@@ -128,6 +130,61 @@ public class AppShellTests
 
         workspace.HasUnsavedChanges.Should().BeTrue();
         dockShellController.PreviewCalls.Should().BeGreaterThan(0);
+        store.LastSavedWorkspace.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task WorkspaceEditor_ShouldAutoSaveLatestChangeAfterEditingStops()
+    {
+        var panel = new Panel(Guid.NewGuid(), "Work", PanelPosition.Bottom, PanelLayoutMode.IconWithLabel, new PanelAppearance(0.9, 40, true, true, false));
+        var store = new StubWorkspaceStore(new Workspace(1, new AppSettings("en", "system", false, "Alt+Space"), new[] { panel }, [], [], []));
+        var workspace = CreateWorkspaceEditor(store);
+
+        await workspace.LoadAsync();
+        workspace.SelectedPanel!.Name = "First name";
+        await Task.Delay(100);
+        workspace.SelectedPanel.Name = "Final name";
+
+        for (var attempt = 0; attempt < 60 && store.LastSavedWorkspace is null; attempt++)
+        {
+            await Task.Delay(50);
+        }
+
+        store.LastSavedWorkspace.Should().NotBeNull();
+        store.LastSavedWorkspace!.Panels.Single().Name.Should().Be("Final name");
+        workspace.HasUnsavedChanges.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task WorkspaceEditor_ShouldFlushPendingEditBeforeClosing()
+    {
+        var panel = new Panel(Guid.NewGuid(), "Work", PanelPosition.Bottom, PanelLayoutMode.IconWithLabel, new PanelAppearance(0.9, 40, true, true, false));
+        var store = new StubWorkspaceStore(new Workspace(1, new AppSettings("en", "system", false, "Alt+Space"), new[] { panel }, [], [], []));
+        var workspace = CreateWorkspaceEditor(store);
+
+        await workspace.LoadAsync();
+        workspace.SelectedPanel!.Name = "Saved on close";
+        await workspace.FlushPendingChangesAsync();
+
+        store.LastSavedWorkspace!.Panels.Single().Name.Should().Be("Saved on close");
+        workspace.HasUnsavedChanges.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task WorkspaceEditor_ShouldKeepChangesPendingWhenSaveFails()
+    {
+        var panel = new Panel(Guid.NewGuid(), "Work", PanelPosition.Bottom, PanelLayoutMode.IconWithLabel, new PanelAppearance(0.9, 40, true, true, false));
+        var store = new StubWorkspaceStore(new Workspace(1, new AppSettings("en", "system", false, "Alt+Space"), new[] { panel }, [], [], []))
+        {
+            FailSaves = true
+        };
+        var workspace = CreateWorkspaceEditor(store);
+
+        await workspace.LoadAsync();
+        workspace.SelectedPanel!.Name = "Pending";
+        await Assert.ThrowsAsync<IOException>(() => workspace.FlushPendingChangesAsync());
+
+        workspace.HasUnsavedChanges.Should().BeTrue();
         store.LastSavedWorkspace.Should().BeNull();
     }
 
@@ -1462,6 +1519,8 @@ public class AppShellTests
 
         public Workspace? LastSavedWorkspace { get; private set; }
 
+        public bool FailSaves { get; set; }
+
         public Workspace? LastExportedWorkspace { get; private set; }
 
         public Workspace? ImportedWorkspace { get; set; }
@@ -1479,6 +1538,11 @@ public class AppShellTests
 
         public Task SaveAsync(Workspace workspace, CancellationToken cancellationToken)
         {
+            if (FailSaves)
+            {
+                throw new IOException("The workspace file is unavailable.");
+            }
+
             LastSavedWorkspace = workspace;
             _workspace = workspace;
             return Task.CompletedTask;

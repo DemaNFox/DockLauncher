@@ -602,9 +602,24 @@ public sealed class DockShellCoordinator : IDockShellController
             .Any(window => new WindowInteropHelper(window).Handle == handle);
     }
 
-    public void Exit()
+    public async void Exit()
     {
-        foreach (var mainWindow in Application.Current.Windows.OfType<MainWindow>())
+        var windows = Application.Current.Windows.OfType<MainWindow>().ToArray();
+        try
+        {
+            foreach (var mainWindow in windows)
+            {
+                await mainWindow.FlushPendingChangesAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show($"Could not save workspace changes: {exception.Message}",
+                "DocSoft", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        foreach (var mainWindow in windows)
         {
             mainWindow.AllowClose();
         }

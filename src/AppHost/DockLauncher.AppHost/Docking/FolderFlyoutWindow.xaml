@@ -29,7 +29,7 @@
                                TextTrimming="CharacterEllipsis" />
                     <TextBlock Margin="0,4,0,0"
                                FontSize="12"
-                               Foreground="#FF94A3B8"
+                               Foreground="#FF96A8B6"
                                Text="{Binding EntryCountLabel}" />
                 </StackPanel>
                 <Grid Margin="0,14,0,0">
@@ -38,8 +38,8 @@
                     </Grid.ColumnDefinitions>
                     <Button Padding="14,7"
                             Style="{StaticResource ActionButtonStyle}"
-                            Background="#FF334155"
-                            BorderBrush="#FF64748B"
+                            Background="#FF2B424C"
+                            BorderBrush="#FF4F6C76"
                             Command="{Binding OpenInExplorerCommand}"
                             Content="Open In Explorer" />
                 </Grid>

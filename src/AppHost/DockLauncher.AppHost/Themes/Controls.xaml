@@ -9,7 +9,7 @@
         <Setter Property="Margin" Value="0" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="CaretBrush" Value="#F8FAFC" />
-        <Setter Property="SelectionBrush" Value="#334155" />
+        <Setter Property="SelectionBrush" Value="#2F6A65" />
         <Setter Property="SelectionTextBrush" Value="#F8FAFC" />
         <Setter Property="Template">
             <Setter.Value>
@@ -23,12 +23,12 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#1A2638" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#475569" />
+                            <Setter TargetName="Chrome" Property="Background" Value="#172633" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#526776" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#182235" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#38BDF8" />
+                            <Setter TargetName="Chrome" Property="Background" Value="#192A35" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -97,7 +97,7 @@
                             <Border Margin="0,4,0,0"
                                     MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                                     Background="#182235"
-                                    BorderBrush="#334155"
+                                    BorderBrush="{StaticResource InputStroke}"
                                     BorderThickness="1"
                                     CornerRadius="10">
                                 <ScrollViewer MaxHeight="360"
@@ -113,7 +113,7 @@
                             <Setter TargetName="Chrome" Property="BorderBrush" Value="#475569" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#38BDF8" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
@@ -150,8 +150,50 @@
     </Style>
 
     <Style TargetType="Slider">
-        <Setter Property="Margin" Value="0,6,0,0" />
+        <Setter Property="Margin" Value="0,8,0,0" />
         <Setter Property="Minimum" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid Height="22">
+                        <Track x:Name="PART_Track" VerticalAlignment="Center">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="Slider.DecreaseLarge" Focusable="False"
+                                              Background="{StaticResource PrimaryBrush}">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="4" Background="{TemplateBinding Background}"
+                                                    CornerRadius="2" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Width="15" Height="15">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Ellipse Fill="#E5FAF4" Stroke="{StaticResource PrimaryBrush}"
+                                                     StrokeThickness="2" />
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="Slider.IncreaseLarge" Focusable="False"
+                                              Background="#344756">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="4" Background="{TemplateBinding Background}"
+                                                    CornerRadius="2" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style TargetType="CheckBox">
@@ -193,28 +235,28 @@
     </Style>
 
     <Style x:Key="SelectableCardStyle" TargetType="Border">
-        <Setter Property="Background" Value="#E21A2738" />
-        <Setter Property="BorderBrush" Value="#2B3E55" />
+        <Setter Property="Background" Value="{StaticResource CardBrushStrong}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CardStroke}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="CornerRadius" Value="12" />
         <Style.Triggers>
             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                <Setter Property="Background" Value="#263A55" />
-                <Setter Property="BorderBrush" Value="#FF38BDF8" />
-                <Setter Property="BorderThickness" Value="2" />
+                <Setter Property="Background" Value="#203B42" />
+                <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
             </DataTrigger>
             <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                <Setter Property="Background" Value="#203047" />
+                <Setter Property="Background" Value="#1D303D" />
             </DataTrigger>
         </Style.Triggers>
     </Style>
 
     <Style x:Key="ActionButtonStyle" TargetType="Button">
         <Setter Property="Foreground" Value="#F8FAFC" />
-        <Setter Property="Background" Value="#1E293B" />
-        <Setter Property="BorderBrush" Value="#334155" />
+        <Setter Property="Background" Value="#1A2A37" />
+        <Setter Property="BorderBrush" Value="{StaticResource CardStroke}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="14,9" />
+        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="MinHeight" Value="36" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
@@ -224,20 +266,23 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="10">
+                            CornerRadius="9">
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#263548" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#475569" />
+                            <Setter TargetName="Chrome" Property="Background" Value="#263B48" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#567080" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Chrome" Property="Opacity" Value="0.9" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -274,22 +319,25 @@
                     <Border x:Name="Chrome"
                             Margin="0,0,10,0"
                             Padding="14,8"
-                            Background="#132033"
-                            BorderBrush="#233247"
+                            Background="#172431"
+                            BorderBrush="#2A3B49"
                             BorderThickness="1"
-                            CornerRadius="10">
+                            CornerRadius="9">
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
                                           ContentSource="Header" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#1E293B" />
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="#38BDF8" />
+                            <Setter TargetName="Chrome" Property="Background" Value="#1D3B42" />
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
                             <Setter Property="Foreground" Value="#F8FAFC" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="#1A2840" />
+                            <Setter TargetName="Chrome" Property="Background" Value="#233646" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

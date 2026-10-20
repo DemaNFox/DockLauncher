@@ -28,7 +28,7 @@ public sealed class AppStartupE2ETests
                 TimeSpan.FromSeconds(15),
                 "first-run marker was not created.");
 
-            var configurator = await WaitForWindowAsync(process.Id, "DockLauncher Configurator", TimeSpan.FromSeconds(15));
+            var configurator = await WaitForWindowAsync(process.Id, "DocSoft — Workspace", TimeSpan.FromSeconds(15));
 
             configurator.Should().NotBeNull();
             process.HasExited.Should().BeFalse();

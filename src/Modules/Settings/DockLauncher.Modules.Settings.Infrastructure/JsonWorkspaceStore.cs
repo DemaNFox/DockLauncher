@@ -71,7 +71,19 @@ public sealed class JsonWorkspaceStore : IWorkspaceStore
     public async Task SaveAsync(Workspace workspace, CancellationToken cancellationToken)
     {
         _fileSystem.Directory.CreateDirectory(_paths.Root);
-        await WriteWorkspaceAsync(workspace, _paths.WorkspaceFilePath, cancellationToken);
+        var temporaryPath = _paths.WorkspaceFilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            await WriteWorkspaceAsync(workspace, temporaryPath, cancellationToken);
+            _fileSystem.File.Move(temporaryPath, _paths.WorkspaceFilePath, overwrite: true);
+        }
+        finally
+        {
+            if (_fileSystem.File.Exists(temporaryPath))
+            {
+                _fileSystem.File.Delete(temporaryPath);
+            }
+        }
     }
 
     public Task ExportAsync(Workspace workspace, string path, CancellationToken cancellationToken)

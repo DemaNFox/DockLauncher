@@ -30,6 +30,12 @@ dotnet build src\DockLauncher.sln --no-restore
 dotnet run --project src\AppHost\DockLauncher.AppHost\DockLauncher.AppHost.csproj
 ```
 
+## Workspace editor
+
+The DocSoft configurator has four sections: Appearance, Items, Groups, and Profiles. Select a panel in the left column, then edit its settings or shortcuts in the section on the right. Changes preview on the runtime panels and save to the workspace file automatically after a short pause. Closing the configurator or exiting DocSoft flushes pending edits; if saving fails, the window stays open and shows the error.
+
+Import, Export, Reset, and Reload are available in the header. Reset replaces the current workspace. The DocSoft mark is shared by the window, executable, and tray icon; regenerate the icon assets with `python tools\Generate-DocSoftIcons.py` (Pillow required).
+
 ## Publish
 
 Create a production package:

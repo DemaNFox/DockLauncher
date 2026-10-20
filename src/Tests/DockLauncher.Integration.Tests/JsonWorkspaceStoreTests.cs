@@ -49,6 +49,22 @@ public class JsonWorkspaceStoreTests
     }
 
     [Fact]
+    public async Task SaveAsync_ShouldReplaceExistingWorkspaceWithoutLeavingTemporaryFile()
+    {
+        var root = @"C:\Users\Test\AppData\Roaming\DockLauncher";
+        var fileSystem = new MockFileSystem();
+        var store = new JsonWorkspaceStore(fileSystem, new SystemTextJsonSerializer(), new AppDataPaths(root));
+        var first = new Panel(Guid.NewGuid(), "First", PanelPosition.Bottom, PanelLayoutMode.IconOnly, new PanelAppearance(0.9, 40, true, false, false));
+        var latest = new Panel(Guid.NewGuid(), "Latest", PanelPosition.Bottom, PanelLayoutMode.IconOnly, new PanelAppearance(0.9, 40, true, false, false));
+
+        await store.SaveAsync(new Workspace(1, new AppSettings("en", "system", false, "Alt+Space"), new[] { first }, [], [], []), CancellationToken.None);
+        await store.SaveAsync(new Workspace(1, new AppSettings("en", "system", false, "Alt+Space"), new[] { latest }, [], [], []), CancellationToken.None);
+
+        (await store.LoadAsync(CancellationToken.None)).Panels.Single().Name.Should().Be("Latest");
+        fileSystem.Directory.GetFiles(root, "*.tmp").Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task SaveAsync_ThenLoadAsync_ShouldPreservePanelAppearance()
     {
         var root = @"C:\Users\Test\AppData\Roaming\DockLauncher";

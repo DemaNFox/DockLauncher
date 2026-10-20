@@ -7,8 +7,14 @@
     <UseWPF>true</UseWPF>
     <StartupObject>DockLauncher.AppHost.Program</StartupObject>
     <AssemblyName>DockLauncher</AssemblyName>
-    <Product>DockLauncher</Product>
+    <Product>DocSoft</Product>
+    <ApplicationIcon>Resources\DocSoft.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Resources\DocSoft.ico" />
+    <Resource Include="Resources\DocSoft.png" />
+    <Resource Include="Resources\DocSoft.Tray.ico" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="gong-wpf-dragdrop" />

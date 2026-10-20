@@ -143,7 +143,7 @@
                 <MenuItem Command="{Binding OpenLaunchProfilesEditorCommand}" Header="Create Launch Profile In Configurator" />
             </MenuItem>
             <Separator />
-            <MenuItem Command="{Binding ShowConfiguratorCommand}" Header="Open Configurator" />
+            <MenuItem Command="{Binding ShowConfiguratorCommand}" Header="Open DocSoft" />
             <MenuItem Command="{Binding RenamePanelCommand}" Header="Rename Panel" />
             <MenuItem Command="{Binding DuplicatePanelCommand}" Header="Duplicate Panel" />
             <MenuItem Command="{Binding CreateEmptyPanelCommand}" Header="New Empty Panel" />
@@ -331,8 +331,8 @@
                                             ToolTipService.Placement="{Binding DataContext.HoverLabelPlacement, RelativeSource={RelativeSource AncestorType=Window}}"
                                             ToolTipService.VerticalOffset="{Binding DataContext.HoverLabelVerticalOffset, RelativeSource={RelativeSource AncestorType=Window}}">
                                         <Button.ToolTip>
-                                            <ToolTip Background="#F11E293B"
-                                                     BorderBrush="#6638BDF8"
+                                            <ToolTip Background="#F1142430"
+                                                     BorderBrush="#6663D5BF"
                                                      Foreground="#FFF8FAFC"
                                                      Padding="10,8"
                                                      PlacementTarget="{Binding RelativeSource={RelativeSource AncestorType=Button}}">
@@ -368,7 +368,7 @@
                                                            VerticalAlignment="Center"
                                                            FontSize="10"
                                                            FontWeight="Bold"
-                                                           Foreground="#FF0B1220"
+                                                           Foreground="#FF0B1119"
                                                            Visibility="{Binding GlyphVisibility}"
                                                            Text="{Binding Glyph}" />
                                             </Grid>
@@ -414,13 +414,13 @@
                             Width="4"
                             Height="36"
                             Visibility="Collapsed"
-                            Background="#FF38BDF8"
+                            Background="#FF63D5BF"
                             CornerRadius="2">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="9"
                                               ShadowDepth="0"
                                               Opacity="0.9"
-                                              Color="#FF38BDF8" />
+                                              Color="#FF63D5BF" />
                         </Border.Effect>
                     </Border>
                 </Canvas>
@@ -434,7 +434,7 @@
                            FontWeight="Bold"
                            TextAlignment="Center"
                            Foreground="#DDF8FAFC"
-                           Background="#991E293B"
+                           Background="#99162531"
                            Text="&lt;"
                            Visibility="{Binding HorizontalOverflowIndicatorVisibility}" />
                 <TextBlock x:Name="OverflowEndIndicator"
@@ -447,7 +447,7 @@
                            FontWeight="Bold"
                            TextAlignment="Center"
                            Foreground="#DDF8FAFC"
-                           Background="#991E293B"
+                           Background="#99162531"
                            Text="&gt;"
                            Visibility="{Binding HorizontalOverflowIndicatorVisibility}" />
                 <TextBlock x:Name="OverflowTopIndicator"
@@ -460,7 +460,7 @@
                            FontWeight="Bold"
                            TextAlignment="Center"
                            Foreground="#DDF8FAFC"
-                           Background="#991E293B"
+                           Background="#99162531"
                            Text="^"
                            Visibility="{Binding VerticalOverflowIndicatorVisibility}" />
                 <TextBlock x:Name="OverflowBottomIndicator"
@@ -473,7 +473,7 @@
                            FontWeight="Bold"
                            TextAlignment="Center"
                            Foreground="#DDF8FAFC"
-                           Background="#991E293B"
+                           Background="#99162531"
                            Text="v"
                            Visibility="{Binding VerticalOverflowIndicatorVisibility}" />
             </Grid>

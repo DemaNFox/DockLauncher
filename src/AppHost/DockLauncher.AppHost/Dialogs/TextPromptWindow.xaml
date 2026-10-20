@@ -8,8 +8,16 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize"
         WindowStyle="SingleBorderWindow"
-        Title="{Binding WindowTitle}">
-    <Border Padding="18" Background="#FF111827">
+        Title="{Binding WindowTitle}"
+        Icon="../Resources/DocSoft.ico"
+        Background="{StaticResource WindowBrush}"
+        Foreground="#F8FAFC"
+        FontFamily="Segoe UI Variable Display, Segoe UI">
+    <Border Margin="14" Padding="20"
+            Background="{StaticResource CardBrush}"
+            BorderBrush="{StaticResource CardStroke}"
+            BorderThickness="1"
+            CornerRadius="14">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -20,12 +28,12 @@
 
             <TextBlock FontSize="20"
                        FontWeight="SemiBold"
-                       Foreground="White"
+                       Foreground="#F8FAFC"
                        Text="{Binding WindowTitle}" />
 
             <TextBlock Grid.Row="1"
                        Margin="0,14,0,0"
-                       Foreground="#FFD1D5DB"
+                       Foreground="{StaticResource MutedBrush}"
                        TextWrapping="Wrap"
                        Text="{Binding PromptMessage}" />
 
@@ -42,10 +50,12 @@
                 <Button MinWidth="92"
                         Margin="0,0,10,0"
                         Padding="16,7"
+                        Style="{StaticResource ActionButtonStyle}"
                         IsCancel="True"
                         Content="Cancel" />
                 <Button MinWidth="92"
                         Padding="16,7"
+                        Style="{StaticResource PrimaryButtonStyle}"
                         IsDefault="True"
                         Command="{Binding AcceptCommand}"
                         Content="OK" />

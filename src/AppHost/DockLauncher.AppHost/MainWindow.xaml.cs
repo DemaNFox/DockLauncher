@@ -35,6 +35,13 @@ public partial class MainWindow : Window
         _allowClose = true;
     }
 
+    public Task FlushPendingChangesAsync()
+    {
+        return DataContext is MainWindowViewModel viewModel
+            ? viewModel.Workspace.FlushPendingChangesAsync()
+            : Task.CompletedTask;
+    }
+
     private async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         if (_allowClose)
@@ -43,31 +50,16 @@ public partial class MainWindow : Window
         }
 
         e.Cancel = true;
-        if (DataContext is MainWindowViewModel { Workspace.HasUnsavedChanges: true } viewModel)
+        try
         {
-            var result = MessageBox.Show(
-                this,
-                "Exit without saving changes? You can save, discard the previewed changes, or cancel and keep editing.",
-                "Unsaved Changes",
-                MessageBoxButton.YesNoCancel,
-                MessageBoxImage.Warning);
-
-            if (result == MessageBoxResult.Cancel)
-            {
-                return;
-            }
-
-            if (result == MessageBoxResult.Yes)
-            {
-                await viewModel.Workspace.SaveCommand.ExecuteAsync(null);
-            }
-            else
-            {
-                await viewModel.Workspace.DiscardChangesAsync();
-            }
+            await FlushPendingChangesAsync();
+            Hide();
         }
-
-        Hide();
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, $"Could not save workspace changes: {exception.Message}",
+                "DocSoft", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void OnPanelItemsDragOver(object sender, DragEventArgs e)

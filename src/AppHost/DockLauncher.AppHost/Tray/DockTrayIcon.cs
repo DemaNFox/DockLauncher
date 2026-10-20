@@ -1,5 +1,5 @@
 using System.Windows.Controls;
-using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows;
 using DockLauncher.BuildingBlocks.Application.Contracts;
 using H.NotifyIcon;
@@ -25,7 +25,7 @@ public sealed class DockTrayIcon : IDisposable
 
         var contextMenu = new ContextMenu();
 
-        var openConfigurator = new MenuItem { Header = "Open Configurator" };
+        var openConfigurator = new MenuItem { Header = "Open DocSoft" };
         openConfigurator.Click += (_, _) => _dockShellController.ShowConfigurator();
         contextMenu.Items.Add(openConfigurator);
 
@@ -43,24 +43,15 @@ public sealed class DockTrayIcon : IDisposable
 
         contextMenu.Items.Add(new Separator());
 
-        var exitItem = new MenuItem { Header = "Exit DockLauncher" };
+        var exitItem = new MenuItem { Header = "Exit DocSoft" };
         exitItem.Click += (_, _) => _dockShellController.Exit();
         contextMenu.Items.Add(exitItem);
 
         _taskbarIcon = new TaskbarIcon
         {
-            ToolTipText = "DockLauncher",
+            ToolTipText = "DocSoft",
             ContextMenu = contextMenu,
-            IconSource = new GeneratedIconSource
-            {
-                Text = "D",
-                FontSize = 54,
-                FontWeight = FontWeights.Bold,
-                Background = new SolidColorBrush(Color.FromRgb(31, 41, 55)),
-                Foreground = new SolidColorBrush(Color.FromRgb(244, 247, 250)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(75, 85, 99)),
-                BorderThickness = 6
-            }
+            IconSource = new BitmapImage(new Uri("pack://application:,,,/Resources/DocSoft.Tray.ico"))
         };
 
         _taskbarIcon.TrayLeftMouseUp += (_, _) => _dockShellController.EnsurePanelsVisible();

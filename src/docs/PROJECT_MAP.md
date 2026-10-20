@@ -109,6 +109,9 @@ Current feature areas:
 ### If the task is about window layout or visual issues
 
 - `src/AppHost/DockLauncher.AppHost/MainWindow.xaml`
+- `src/AppHost/DockLauncher.AppHost/Themes/Palette.xaml`
+- `src/AppHost/DockLauncher.AppHost/Themes/Controls.xaml`
+- `src/AppHost/DockLauncher.AppHost/Resources/DocSoft.*` and `tools/Generate-DocSoftIcons.py` for the app and tray mark
 - `src/AppHost/DockLauncher.AppHost/Docking/*.xaml`
 - `src/AppHost/DockLauncher.AppHost/Themes/*.xaml`
 - `src/AppHost/DockLauncher.AppHost/Dialogs/PanelColorPicker.cs`
@@ -117,6 +120,7 @@ Current feature areas:
 
 - `src/Modules/Settings/DockLauncher.Modules.Settings.Presentation.Wpf/WorkspaceEditorViewModel.cs`
 - `src/AppHost/DockLauncher.AppHost/MainWindow.xaml.cs`
+- `src/Modules/Settings/DockLauncher.Modules.Settings.Infrastructure/JsonWorkspaceStore.cs` for atomic workspace writes
 
 ### If the task is about runtime dock size, spacing, labels, panel appearance
 
