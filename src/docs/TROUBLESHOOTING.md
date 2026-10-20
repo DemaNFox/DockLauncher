@@ -4,6 +4,11 @@
 
 This file records build and project issues already encountered in this repository, plus the exact direction that helped resolve them. Check this file before debugging the same class of problem again.
 
+## 2026-10-20: Panel tags had uneven pill shapes
+
+- The position and layout tags in `MainWindow.xaml` used `CornerRadius="999"` on short borders, which distorted their ends.
+- Use a modest `CornerRadius="6"` for these compact tags; keep both tag styles consistent.
+
 ## 2026-10-20: Old shortcuts remain in the configurator
 
 ### Symptoms

@@ -243,7 +243,7 @@
                                                         Background="#1A3039"
                                                         BorderBrush="#2D4A50"
                                                         BorderThickness="1"
-                                                        CornerRadius="999">
+                                                        CornerRadius="6">
                                                     <TextBlock FontSize="11" Text="{Binding Position}" />
                                                 </Border>
                                                 <Border Margin="0,0,0,8"
@@ -251,7 +251,7 @@
                                                         Background="#1A3039"
                                                         BorderBrush="#2D4A50"
                                                         BorderThickness="1"
-                                                        CornerRadius="999">
+                                                        CornerRadius="6">
                                                     <TextBlock FontSize="11" Text="{Binding LayoutMode}" />
                                                 </Border>
                                             </WrapPanel>
